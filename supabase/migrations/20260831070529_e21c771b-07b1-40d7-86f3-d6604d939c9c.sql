@@ -1,0 +1,17 @@
+ALTER TABLE public.salary_structures
+  ADD COLUMN IF NOT EXISTS medical_allowance numeric NOT NULL DEFAULT 0,
+  ADD COLUMN IF NOT EXISTS special_allowance numeric NOT NULL DEFAULT 0,
+  ADD COLUMN IF NOT EXISTS pf_employee numeric NOT NULL DEFAULT 0,
+  ADD COLUMN IF NOT EXISTS pf_employer numeric NOT NULL DEFAULT 0,
+  ADD COLUMN IF NOT EXISTS esic_employee numeric NOT NULL DEFAULT 0,
+  ADD COLUMN IF NOT EXISTS esic_employer numeric NOT NULL DEFAULT 0,
+  ADD COLUMN IF NOT EXISTS mediclaim numeric NOT NULL DEFAULT 0,
+  ADD COLUMN IF NOT EXISTS tds numeric NOT NULL DEFAULT 0,
+  ADD COLUMN IF NOT EXISTS professional_tax numeric NOT NULL DEFAULT 0,
+  ADD COLUMN IF NOT EXISTS labour_welfare_fund numeric NOT NULL DEFAULT 0,
+  ADD COLUMN IF NOT EXISTS gratuity numeric NOT NULL DEFAULT 0,
+  ADD COLUMN IF NOT EXISTS loan_recovery numeric NOT NULL DEFAULT 0,
+  ADD COLUMN IF NOT EXISTS other_deductions numeric NOT NULL DEFAULT 0,
+  ADD COLUMN IF NOT EXISTS uan_no text,
+  ADD COLUMN IF NOT EXISTS esic_no text,
+  ADD COLUMN IF NOT EXISTS pan_no text;

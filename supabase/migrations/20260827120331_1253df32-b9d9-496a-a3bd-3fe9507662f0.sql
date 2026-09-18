@@ -1,0 +1,1 @@
+CREATE POLICY "staff create depots" ON public.depots FOR INSERT TO authenticated WITH CHECK (true);

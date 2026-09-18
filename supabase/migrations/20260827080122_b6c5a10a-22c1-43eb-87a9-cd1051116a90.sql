@@ -1,0 +1,1 @@
+ALTER TABLE public.retailers ADD COLUMN IF NOT EXISTS retailer_type text NOT NULL DEFAULT 'no_ba';
