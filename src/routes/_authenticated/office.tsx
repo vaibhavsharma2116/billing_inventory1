@@ -45,26 +45,6 @@ function OfficePage() {
   const [checkoutNote, setCheckoutNote] = useState("");
   const [elapsed, setElapsed] = useState("");
 
-  // Live working-time clock: ticks every second while checked in, freezes on checkout.
-  useEffect(() => {
-    const att = data?.attendance;
-    if (!att?.punch_in) { setElapsed(""); return; }
-    const punchIn = new Date(att.punch_in).getTime();
-    const end = att.punch_out ? new Date(att.punch_out).getTime() : null;
-    const tick = () => {
-      const diff = Math.max((end ?? Date.now()) - punchIn, 0);
-      const h = Math.floor(diff / 3600000);
-      const m = Math.floor((diff % 3600000) / 60000);
-      const s = Math.floor((diff % 60000) / 1000);
-      setElapsed(`${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`);
-    };
-    tick();
-    if (!end) {
-      const id = setInterval(tick, 1000);
-      return () => clearInterval(id);
-    }
-  }, [data?.attendance]);
-
   const { data } = useQuery({
     queryKey: ["office-day", userId],
     enabled: !!userId,
@@ -88,6 +68,27 @@ function OfficePage() {
       };
     },
   });
+
+  // Live working-time clock: ticks every second while checked in, freezes on checkout.
+  // MUST be placed after useQuery so that `data` is declared before being used in deps.
+  useEffect(() => {
+    const att = data?.attendance;
+    if (!att?.punch_in) { setElapsed(""); return; }
+    const punchIn = new Date(att.punch_in).getTime();
+    const end = att.punch_out ? new Date(att.punch_out).getTime() : null;
+    const tick = () => {
+      const diff = Math.max((end ?? Date.now()) - punchIn, 0);
+      const h = Math.floor(diff / 3600000);
+      const m = Math.floor((diff % 3600000) / 60000);
+      const s = Math.floor((diff % 60000) / 1000);
+      setElapsed(`${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`);
+    };
+    tick();
+    // Start interval only when not yet checked out; always return cleanup
+    const timerId = end ? undefined : setInterval(tick, 1000);
+    return () => { if (timerId !== undefined) clearInterval(timerId); };
+  }, [data?.attendance]);
+
 
   const tasks = data?.tasks ?? [];
   const doneToday = tasks.filter((t) => t.status === "done").length;
