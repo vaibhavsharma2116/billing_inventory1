@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
@@ -43,6 +43,27 @@ function OfficePage() {
   const userId = me?.profile?.id;
   const [notes, setNotes] = useState<Record<string, string>>({});
   const [checkoutNote, setCheckoutNote] = useState("");
+  const [elapsed, setElapsed] = useState("");
+
+  // Live working-time clock: ticks every second while checked in, freezes on checkout.
+  useEffect(() => {
+    const att = data?.attendance;
+    if (!att?.punch_in) { setElapsed(""); return; }
+    const punchIn = new Date(att.punch_in).getTime();
+    const end = att.punch_out ? new Date(att.punch_out).getTime() : null;
+    const tick = () => {
+      const diff = Math.max((end ?? Date.now()) - punchIn, 0);
+      const h = Math.floor(diff / 3600000);
+      const m = Math.floor((diff % 3600000) / 60000);
+      const s = Math.floor((diff % 60000) / 1000);
+      setElapsed(`${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`);
+    };
+    tick();
+    if (!end) {
+      const id = setInterval(tick, 1000);
+      return () => clearInterval(id);
+    }
+  }, [data?.attendance]);
 
   const { data } = useQuery({
     queryKey: ["office-day", userId],
@@ -152,6 +173,17 @@ function OfficePage() {
               onChange={(e) => setCheckoutNote(e.target.value)}
               className="bg-primary-foreground/10 text-primary-foreground placeholder:text-primary-foreground/70"
             />
+          </div>
+        ) : null}
+        {elapsed ? (
+          <div className="mt-3 rounded-xl bg-primary-foreground/10 px-4 py-3">
+            <p className="text-xs uppercase tracking-widest opacity-70">Working time</p>
+            <p className="mt-0.5 font-mono text-2xl font-semibold tabular-nums">{elapsed}</p>
+            <p className="mt-1 text-xs opacity-80">
+              In: {data?.attendance?.punch_in ? new Date(data.attendance.punch_in).toLocaleTimeString("en-IN") : "—"}
+              {" · "}
+              Out: {data?.attendance?.punch_out ? new Date(data.attendance.punch_out).toLocaleTimeString("en-IN") : "running"}
+            </p>
           </div>
         ) : null}
         <div className="mt-4 flex gap-2">

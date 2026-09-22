@@ -21,6 +21,7 @@ const LEAVE_TYPES = [
   { value: "sick", label: "Sick Leave" },
   { value: "earned", label: "Earned Leave" },
   { value: "unpaid", label: "Leave Without Pay" },
+  { value: "half_day", label: "Half Day" },
 ];
 
 const day = (v: string | null | undefined) => (v ? new Date(v).toLocaleDateString("en-IN") : "—");
@@ -87,7 +88,15 @@ export function LeaveApply({ userId }: { userId?: string | undefined }) {
         <div className="space-y-3 border-b border-border/60 p-3">
           <div className="space-y-1.5">
             <Label>Leave type</Label>
-            <Select value={form.leaveType} onValueChange={(v) => setForm((f) => ({ ...f, leaveType: v }))}>
+            <Select
+              value={form.leaveType}
+              onValueChange={(v) => setForm((f) => ({
+                ...f,
+                leaveType: v,
+                // Half day: auto-set toDate = fromDate
+                toDate: v === "half_day" ? f.fromDate : f.toDate,
+              }))}
+            >>
               <SelectTrigger><SelectValue /></SelectTrigger>
               <SelectContent>
                 {LEAVE_TYPES.map((t) => (
@@ -99,12 +108,23 @@ export function LeaveApply({ userId }: { userId?: string | undefined }) {
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div className="space-y-1.5">
               <Label>From</Label>
-              <Input type="date" value={form.fromDate} onChange={(e) => setForm((f) => ({ ...f, fromDate: e.target.value }))} />
+              <Input
+                type="date"
+                value={form.fromDate}
+                onChange={(e) => setForm((f) => ({
+                  ...f,
+                  fromDate: e.target.value,
+                  // Keep toDate in sync for half_day
+                  toDate: f.leaveType === "half_day" ? e.target.value : f.toDate,
+                }))}
+              />
             </div>
-            <div className="space-y-1.5">
-              <Label>To</Label>
-              <Input type="date" value={form.toDate} onChange={(e) => setForm((f) => ({ ...f, toDate: e.target.value }))} />
-            </div>
+            {form.leaveType !== "half_day" && (
+              <div className="space-y-1.5">
+                <Label>To</Label>
+                <Input type="date" value={form.toDate} onChange={(e) => setForm((f) => ({ ...f, toDate: e.target.value }))} />
+              </div>
+            )}
           </div>
           <div className="space-y-1.5">
             <Label>Reason</Label>

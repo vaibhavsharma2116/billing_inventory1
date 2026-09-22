@@ -63,6 +63,7 @@ export function AutoPayroll() {
   const [month, setMonth] = useState(months[0]!.value);
   const [payLeaves, setPayLeaves] = useState(true);
   const [addReimbursement, setAddReimbursement] = useState(true);
+  const [searchQuery, setSearchQuery] = useState("");
 
   const days = useMemo(() => monthDays(month), [month]);
   const from = days[0]!;
@@ -117,10 +118,11 @@ export function AutoPayroll() {
       const sundaySet = new Set(eligibleDays.filter(isSunday));
       const paidBase = Math.max(Math.round((workingDays * eligibleDays.length) / days.length), 0);
 
-      // Any punch-in counts as present, including Sundays.
+      // Sundays are always paid weekly offs — a punch on Sunday must NOT double-count
+      // as present (it is already included in sundaySet / paidLeaveDays).
       const present = new Set(
         data.attendance
-          .filter((a) => a.user_id === p.id && a.punch_in && eligibleDays.includes(a.work_date))
+          .filter((a) => a.user_id === p.id && a.punch_in && eligibleDays.includes(a.work_date) && !isSunday(a.work_date))
           .map((a) => a.work_date),
       );
       const leaveDates = new Set<string>();
@@ -181,6 +183,10 @@ export function AutoPayroll() {
   const totalLop = payable.reduce((s, l) => s + l.lopAmount, 0);
   const monthLabel = months.find((m) => m.value === month)?.label ?? month;
   const absentees = lines.filter((l) => l.absentDays > 0).sort((a, b) => b.absentDays - a.absentDays);
+
+  const q = searchQuery.trim().toLowerCase();
+  const filteredLines = q ? lines.filter((l) => l.name.toLowerCase().includes(q) || l.code.toLowerCase().includes(q)) : lines;
+  const filteredAbsentees = q ? absentees.filter((l) => l.name.toLowerCase().includes(q) || l.code.toLowerCase().includes(q)) : absentees;
 
   const exportPdf = () =>
     downloadReportPdf({
@@ -280,6 +286,15 @@ export function AutoPayroll() {
           <Label>Working days</Label>
           <Input readOnly value={workingDays} className="w-24" />
         </div>
+        <div className="space-y-1.5">
+          <Label>Search employee</Label>
+          <Input
+            placeholder="Name or code…"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="w-44"
+          />
+        </div>
         <p className="text-xs text-muted-foreground">All Sundays are paid weekly off ({sundayCount} this month)</p>
         <label className="flex items-center gap-2 text-sm">
           <Switch checked={payLeaves} onCheckedChange={setPayLeaves} />
@@ -312,17 +327,17 @@ export function AutoPayroll() {
 
       <Tabs defaultValue="sheet" className="p-3">
         <TabsList>
-          <TabsTrigger value="sheet">Payroll sheet ({lines.length})</TabsTrigger>
-          <TabsTrigger value="absent">Absent employees ({absentees.length})</TabsTrigger>
+          <TabsTrigger value="sheet">Payroll sheet ({filteredLines.length})</TabsTrigger>
+          <TabsTrigger value="absent">Absent employees ({filteredAbsentees.length})</TabsTrigger>
         </TabsList>
 
         <TabsContent value="sheet" className="divide-y divide-border/60">
         {isLoading ? (
           <p className="p-4 text-sm text-muted-foreground">Calculating payroll…</p>
-        ) : lines.length === 0 ? (
-          <p className="p-4 text-sm text-muted-foreground">No employees found.</p>
+        ) : filteredLines.length === 0 ? (
+          <p className="p-4 text-sm text-muted-foreground">{q ? `"${searchQuery}" se koi employee nahi mila` : "No employees found."}</p>
         ) : (
-          lines.map((l) => (
+          filteredLines.map((l) => (
             <div key={l.userId} className="flex flex-wrap items-center justify-between gap-2 p-3 text-sm">
               <div className="min-w-0">
                 <p className="truncate font-medium">
@@ -352,10 +367,10 @@ export function AutoPayroll() {
         <div className="divide-y divide-border/60">
           {isLoading ? (
             <p className="p-3 text-sm text-muted-foreground">Calculating…</p>
-          ) : absentees.length === 0 ? (
-            <p className="p-3 text-sm text-muted-foreground">No absents this month.</p>
+          ) : filteredAbsentees.length === 0 ? (
+            <p className="p-3 text-sm text-muted-foreground">{q ? `"${searchQuery}" se koi employee nahi mila` : "No absents this month."}</p>
           ) : (
-            absentees.map((l) => (
+            filteredAbsentees.map((l) => (
               <div key={`abs-${l.userId}`} className="flex flex-wrap items-center justify-between gap-2 p-3 text-sm">
                 <div className="min-w-0">
                   <p className="truncate font-medium">
