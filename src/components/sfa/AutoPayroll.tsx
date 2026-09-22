@@ -72,7 +72,7 @@ export function AutoPayroll() {
   const { data, isLoading } = useQuery({
     queryKey: ["auto-payroll", month],
     queryFn: async () => {
-      const [profilesRaw, roles, attendance, leaves, expenses, salaries] = await Promise.all([
+      const [profilesRaw, roles, attendance, leaves, expenses, salaries, details] = await Promise.all([
         supabase.from("profiles").select("id, full_name, employee_code").order("full_name"),
         supabase.from("user_roles").select("user_id, role"),
         supabase.from("attendance").select("user_id, work_date, punch_in").gte("work_date", from).lte("work_date", to),
@@ -84,6 +84,7 @@ export function AutoPayroll() {
           .gte("expense_date", from)
           .lte("expense_date", to),
         supabase.from("salary_structures").select("*").order("effective_from", { ascending: false }),
+        supabase.from("employee_details").select("user_id, date_of_joining"),
       ]);
       const partyIds = new Set(
         (roles.data ?? [])
@@ -96,6 +97,7 @@ export function AutoPayroll() {
         leaves: leaves.data ?? [],
         expenses: expenses.data ?? [],
         salaries: (salaries.data ?? []) as unknown as Record<string, unknown>[],
+        details: details.data ?? [],
       };
     },
   });
@@ -111,7 +113,13 @@ export function AutoPayroll() {
       const s = data.salaries
         .filter((r) => r["user_id"] === p.id && String(r["effective_from"] ?? "") <= to)
         .sort((a, b) => String(b["effective_from"] ?? "").localeCompare(String(a["effective_from"] ?? "")))[0];
-      const effectiveFrom = s ? String(s["effective_from"] ?? "") : null;
+      const salaryEffFrom = s ? String(s["effective_from"] ?? "") : null;
+      // Also check joining date — use whichever is later (salary effective date vs joining date)
+      const joiningDate = (data.details.find((d) => d.user_id === p.id)?.date_of_joining) ?? null;
+      const effectiveFrom = [salaryEffFrom, joiningDate]
+        .filter((d): d is string => !!d && d >= from)
+        .sort()
+        .pop() ?? (salaryEffFrom && salaryEffFrom >= from ? salaryEffFrom : null);
       // Mid-month joiners / mid-month salary changes are paid only from the effective date.
       const eligibleDays = days.filter((d) => !effectiveFrom || d >= effectiveFrom);
       const partMonth = !!effectiveFrom && eligibleDays.length < days.length;

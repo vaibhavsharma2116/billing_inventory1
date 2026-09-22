@@ -750,6 +750,15 @@ function HrPage() {
                 const gross =
                   n("basic") + n("hra") + n("conveyance") + n("medical_allowance") + n("special_allowance") + n("other_allowance");
                 const net = gross - n("deductions");
+                // Pro-rate check: if effective_from is after the 1st of current month, salary is pro-rated
+                const effFrom = s?.["effective_from"] ? String(s["effective_from"]) : null;
+                const monthFirstDay = new Date().toISOString().slice(0, 8) + "01";
+                const isProRated = !!effFrom && effFrom > monthFirstDay;
+                const daysInMonth = new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0).getDate();
+                const eligibleDays = effFrom
+                  ? daysInMonth - new Date(`${effFrom}T00:00:00`).getDate() + 1
+                  : daysInMonth;
+                const proRatedNet = isProRated ? Math.round((net * eligibleDays) / daysInMonth) : net;
                 return (
                   <div key={p.id} className="flex flex-wrap items-center justify-between gap-2 p-3 text-sm">
                     <div className="min-w-0">
@@ -759,10 +768,18 @@ function HrPage() {
                           ? `Gross ${inr(gross)} • PF ${inr(n("pf_employee"))} • ESIC ${inr(n("esic_employee"))} • Mediclaim ${inr(n("mediclaim"))} • TDS ${inr(n("tds"))} • PT ${inr(n("professional_tax"))} • Total deductions ${inr(n("deductions"))}`
                           : "No salary structure yet"}
                       </p>
+                      {effFrom && (
+                        <p className="text-[11px] text-muted-foreground">
+                          Effective from: {day(effFrom)}
+                          {isProRated && ` — this month pro-rated ${inr(proRatedNet)} of full ${inr(net)}`}
+                        </p>
+                      )}
                     </div>
 
                     <div className="flex items-center gap-2">
-                      <Badge variant="secondary">Net {inr(net)}</Badge>
+                      <Badge variant={isProRated ? "outline" : "secondary"} className={isProRated ? "text-warning" : ""}>
+                        Net {inr(isProRated ? proRatedNet : net)}
+                      </Badge>
                       <Button size="sm" variant="outline" onClick={() => setSalaryFor(p.id)}>
                         {s ? "Edit" : "Add"}
                       </Button>
@@ -962,7 +979,7 @@ const emptySalary = (): SalaryRow => ({
   uan_no: "",
   esic_no: "",
   pan_no: "",
-  effective_from: todayStr(),
+  effective_from: new Date().toISOString().slice(0, 8) + "01",
 });
 
 function SalaryDialog({

@@ -90,13 +90,15 @@ export function LeaveApply({ userId }: { userId?: string | undefined }) {
             <Label>Leave type</Label>
             <Select
               value={form.leaveType}
-              onValueChange={(v) => setForm((f) => ({
-                ...f,
-                leaveType: v,
-                // Half day: auto-set toDate = fromDate
-                toDate: v === "half_day" ? f.fromDate : f.toDate,
-              }))}
-            >>
+              onValueChange={(v) =>
+                setForm((f) => ({
+                  ...f,
+                  leaveType: v,
+                  // Half day: auto-sync toDate = fromDate
+                  toDate: v === "half_day" ? f.fromDate : f.toDate,
+                }))
+              }
+            >
               <SelectTrigger><SelectValue /></SelectTrigger>
               <SelectContent>
                 {LEAVE_TYPES.map((t) => (
@@ -111,18 +113,24 @@ export function LeaveApply({ userId }: { userId?: string | undefined }) {
               <Input
                 type="date"
                 value={form.fromDate}
-                onChange={(e) => setForm((f) => ({
-                  ...f,
-                  fromDate: e.target.value,
-                  // Keep toDate in sync for half_day
-                  toDate: f.leaveType === "half_day" ? e.target.value : f.toDate,
-                }))}
+                onChange={(e) =>
+                  setForm((f) => ({
+                    ...f,
+                    fromDate: e.target.value,
+                    // Keep toDate in sync for half_day
+                    toDate: f.leaveType === "half_day" ? e.target.value : f.toDate,
+                  }))
+                }
               />
             </div>
             {form.leaveType !== "half_day" && (
               <div className="space-y-1.5">
                 <Label>To</Label>
-                <Input type="date" value={form.toDate} onChange={(e) => setForm((f) => ({ ...f, toDate: e.target.value }))} />
+                <Input
+                  type="date"
+                  value={form.toDate}
+                  onChange={(e) => setForm((f) => ({ ...f, toDate: e.target.value }))}
+                />
               </div>
             )}
           </div>
