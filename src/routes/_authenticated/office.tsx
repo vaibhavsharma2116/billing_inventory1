@@ -171,7 +171,7 @@ function OfficePage() {
         ) : null}
       </div>
 
-      <div className="mt-4 grid grid-cols-2 gap-3 md:grid-cols-4">
+      <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-3 md:grid-cols-4">
         <StatCard label="Tasks today" value={String(tasks.length)} />
         <StatCard label="Completed today" value={String(doneToday)} tone="success" />
         <StatCard label="Month achievement" value={`${monthPct}%`} tone="primary" />

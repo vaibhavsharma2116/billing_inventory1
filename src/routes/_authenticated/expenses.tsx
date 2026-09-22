@@ -151,7 +151,7 @@ function ExpensesPage() {
         { to: "/my-report", label: "Reports", icon: BarChart3 },
       ]}
     >
-      <div className="grid grid-cols-3 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
         <StatCard label="This Month" value={inr(monthTotal)} tone="primary" />
         <StatCard label="Pending" value={inr(pending)} tone="warning" />
         <StatCard label="Approved" value={inr(approved)} tone="success" />
@@ -159,7 +159,7 @@ function ExpensesPage() {
 
       <Section title="New Claim">
         <div className="space-y-3 p-4">
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div className="space-y-1.5">
               <Label>Expense type</Label>
               <Select value={kind} onValueChange={setKind}>
@@ -179,7 +179,7 @@ function ExpensesPage() {
 
           {kind === "ta_da" ? (
             <>
-              <div className="grid grid-cols-3 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
                 <div className="space-y-1.5">
                   <Label>Distance (km)</Label>
                   <Input inputMode="decimal" value={km} onChange={(e) => setKm(e.target.value)} placeholder="0" />
@@ -200,7 +200,7 @@ function ExpensesPage() {
             </>
           ) : (
             <>
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div className="space-y-1.5">
                   <Label>Bill amount (₹)</Label>
                   <Input inputMode="decimal" value={bill} onChange={(e) => setBill(e.target.value)} placeholder="0" />

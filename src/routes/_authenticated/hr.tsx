@@ -444,13 +444,13 @@ function HrPage() {
       subtitle="Employee master • Attendance • Leave • Expenses"
       nav={[{ to: "/hr", label: "HR Desk" }]}
     >
-      <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 md:grid-cols-4">
         <StatCard label="Employees" value={String(profiles.length)} tone="primary" onClick={() => openReport("employees")} />
         <StatCard label={`Present on ${day(attDate)}`} value={String(presentToday)} tone="success" onClick={() => openReport("attendance")} />
         <StatCard label="Pending Leaves" value={String(pendingLeaves.length)} tone="warning" onClick={() => openReport("leaves")} />
         <StatCard label="Pending Expenses" value={String(pendingExpenses.length)} tone="danger" onClick={() => openReport("expenses")} />
       </div>
-      <div className="mt-3 grid grid-cols-2 gap-3 md:grid-cols-4">
+      <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-3 md:grid-cols-4">
         <StatCard label="Expense (period)" value={compactInr(expenseTotal)} onClick={() => openReport("expenses")} />
         <StatCard label="Monthly Payroll (net)" value={compactInr(monthlyPayroll)} onClick={() => openReport("payroll")} />
         <StatCard label="Payroll Records" value={String((data?.salaries ?? []).length)} onClick={() => openReport("payroll")} />

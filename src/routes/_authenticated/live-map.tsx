@@ -80,7 +80,7 @@ function LiveMapPage() {
         { to: "/live-map", label: "Live Map" },
       ]}
     >
-      <div className="grid grid-cols-3 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
         <StatCard label="Tracked (24h)" value={String(positions.length)} />
         <StatCard label="Live now" value={String(live.length)} tone="success" hint="Updated ≤ 15 min" />
         <StatCard label="Punched in" value={String(onDuty.length)} tone="primary" />

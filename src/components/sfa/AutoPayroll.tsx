@@ -291,7 +291,7 @@ export function AutoPayroll() {
         </label>
       </div>
 
-      <div className="grid grid-cols-2 gap-3 border-b border-border/60 p-3 text-sm md:grid-cols-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 border-b border-border/60 p-3 text-sm md:grid-cols-4">
         <div>
           <p className="text-xs text-muted-foreground">Employees on payroll</p>
           <p className="font-semibold">{payable.length}</p>

@@ -370,7 +370,7 @@ function ManagerDashboard() {
         <p className="text-sm text-muted-foreground">Loading your team reports…</p>
       ) : (
         <>
-          <div className="grid grid-cols-2 gap-3 lg:grid-cols-5">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 lg:grid-cols-5">
             {[
               { key: "secondary", label: "Secondary Sales", value: secondaryValue, hint: `${secondary.length} orders` },
               { key: "primary", label: "Primary Purchases", value: primaryValue, hint: `${primary.length} orders` },

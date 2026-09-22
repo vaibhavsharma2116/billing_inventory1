@@ -127,7 +127,7 @@ function DepotPage() {
 
   return (
     <Shell title="Master Depot" subtitle={`${myDepot?.name ?? "Depot"} • CSA orders • stock • dispatch`}>
-      <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 md:grid-cols-4">
         <StatCard
           label="Pending CSA Orders"
           value={String(pending.length)}

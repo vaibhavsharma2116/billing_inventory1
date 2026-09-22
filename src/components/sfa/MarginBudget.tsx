@@ -65,7 +65,7 @@ export function MarginBudget({ distributorIds = null, csaIds = null, title = "Ma
 
   return (
     <div className="space-y-4">
-      <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 md:grid-cols-4">
         <StatCard label="Allowed Margin Budget" value={inr(t?.allowed)} tone="primary" hint="Tap for full report" onClick={() => openReport("allowed")} />
         <StatCard label="Margin Given" value={inr(t?.given)} tone="warning" hint="Tap for full report" onClick={() => openReport("given")} />
         <StatCard
@@ -181,7 +181,7 @@ function PartyRow({
       </button>
 
       {isOpen ? (
-        <div className="grid grid-cols-2 gap-2 bg-muted/40 p-3 text-xs md:grid-cols-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 bg-muted/40 p-3 text-xs md:grid-cols-3">
           <Cell label="Allowed margin budget" value={inr(p.allowed)} />
           <Cell label="Given via lower billing" value={inr(p.givenBilling)} />
           <Cell label="Given via free goods" value={inr(p.givenFree)} />

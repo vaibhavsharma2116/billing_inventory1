@@ -324,14 +324,14 @@ function BaPage() {
         </div>
       )}
 
-      <div className="mt-4 grid grid-cols-3 gap-3">
+      <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
         <StatCard label="Sale Value" value={inr(salesValue)} tone="primary" />
         <StatCard label="Units Sold" value={String(salesUnits)} tone="success" />
         <StatCard label="Counter Stock" value={String(stockUnits)} tone="warning" />
       </div>
 
       <Tabs defaultValue="sale" className="mt-4">
-        <TabsList className="grid w-full grid-cols-2">
+        <TabsList>
           <TabsTrigger value="sale">Daily Sale</TabsTrigger>
           <TabsTrigger value="stock">Stock In</TabsTrigger>
         </TabsList>
@@ -375,7 +375,7 @@ function BaPage() {
                 </SelectContent>
               </Select>
             </div>
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div className="space-y-1.5">
                 <Label>Quantity</Label>
                 <Input type="number" min="1" value={saleQty} onChange={(e) => setSaleQty(e.target.value)} />
@@ -460,7 +460,7 @@ function BaPage() {
                 </SelectContent>
               </Select>
             </div>
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div className="space-y-1.5">
                 <Label>{inKind === "opening" ? "Opening qty" : "Received qty"}</Label>
                 <Input type="number" min="1" value={inQty} onChange={(e) => setInQty(e.target.value)} />

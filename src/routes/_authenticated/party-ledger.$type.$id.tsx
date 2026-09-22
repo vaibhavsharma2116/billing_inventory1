@@ -89,7 +89,7 @@ function PartyLedgerDetailPage() {
         </p>
       ) : null}
 
-      <div className="grid grid-cols-3 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
         <StatCard label="Total billed" value={inr(data?.totals.billed ?? 0)} />
         <StatCard label="Received" value={inr(data?.totals.received ?? 0)} />
         <StatCard label="Pending" value={inr(data?.totals.balance ?? 0)} />

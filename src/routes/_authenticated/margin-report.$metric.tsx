@@ -132,7 +132,7 @@ function MarginReportPage() {
 
       <p className="mb-4 text-sm text-muted-foreground">{meta.hint}</p>
 
-      <div className="mb-4 grid grid-cols-2 gap-3 md:grid-cols-3">
+      <div className="mb-4 grid grid-cols-1 sm:grid-cols-2 gap-3 md:grid-cols-3">
         <div className="rounded-xl border border-border bg-card p-3">
           <p className="text-[11px] uppercase tracking-wide text-muted-foreground">Parties</p>
           <p className="text-lg font-bold tabular-nums">{parties.length}</p>

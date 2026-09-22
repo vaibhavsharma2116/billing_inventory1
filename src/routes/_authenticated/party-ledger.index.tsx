@@ -51,7 +51,7 @@ function PartyLedgerListPage() {
         </Button>
       </div>
 
-      <div className="grid grid-cols-3 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
         <StatCard label="Total billed" value={inr(billed)} />
         <StatCard label="Received" value={inr(received)} />
         <StatCard label="Pending" value={inr(balance)} />

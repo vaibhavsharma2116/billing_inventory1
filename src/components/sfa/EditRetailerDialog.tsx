@@ -167,7 +167,7 @@ export function EditRetailerDialog({
               <Label htmlFor="e-name">Shop name *</Label>
               <Input id="e-name" value={form.name} onChange={set("name")} />
             </div>
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div className="grid gap-1.5">
                 <Label htmlFor="e-owner">Owner</Label>
                 <Input id="e-owner" value={form.owner_name} onChange={set("owner_name")} />
@@ -181,7 +181,7 @@ export function EditRetailerDialog({
               <Label htmlFor="e-address">Address</Label>
               <Input id="e-address" value={form.address} onChange={set("address")} />
             </div>
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div className="grid gap-1.5">
                 <Label htmlFor="e-city">City</Label>
                 <Input id="e-city" value={form.city} onChange={set("city")} />
@@ -191,7 +191,7 @@ export function EditRetailerDialog({
                 <Input id="e-state" value={form.state} onChange={set("state")} />
               </div>
             </div>
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div className="grid gap-1.5">
                 <Label htmlFor="e-area">Area</Label>
                 <Input id="e-area" value={form.area} onChange={set("area")} />
@@ -201,7 +201,7 @@ export function EditRetailerDialog({
                 <Input id="e-pincode" inputMode="numeric" value={form.pincode} onChange={set("pincode")} />
               </div>
             </div>
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div className="grid gap-1.5">
               <Label htmlFor="e-email">Email</Label>
               <Input id="e-email" type="email" value={form.email} onChange={set("email")} />
@@ -211,7 +211,7 @@ export function EditRetailerDialog({
               <Label htmlFor="e-gstin">GSTIN</Label>
               <Input id="e-gstin" value={form.gstin} onChange={set("gstin")} />
             </div>
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div className="grid gap-1.5">
                 <Label htmlFor="e-margin">Retail margin %</Label>
                 <Input id="e-margin" inputMode="decimal" value={form.margin_pct} onChange={set("margin_pct")} />

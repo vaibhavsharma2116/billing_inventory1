@@ -126,7 +126,7 @@ function ClaimsPage() {
 
   return (
     <Shell title="Claims" subtitle="Extra margin & display claims with invoice proof">
-      <div className="grid grid-cols-2 gap-3 md:grid-cols-3">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 md:grid-cols-3">
         <StatCard label="Pending Claims" value={inr(pending)} tone="warning" />
         <StatCard label="Approved by Company" value={inr(approved)} tone="success" />
         <StatCard label="Rejected" value={String(rejected)} tone="danger" />

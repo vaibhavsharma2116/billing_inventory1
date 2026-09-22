@@ -295,7 +295,7 @@ function MyReportPage() {
         </Button>
       </div>
 
-      <div className="mt-3 grid grid-cols-2 gap-3">
+      <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-3">
         <StatCard label="My Sales" value={compactInr(mySales)} tone="primary" hint={`${myOrders.length} orders`} />
         <StatCard label="Collection" value={compactInr(collectionTotal)} tone="success" />
         <StatCard label="Achievement" value={`${achievement.toFixed(0)}%`} tone={achievement >= 100 ? "success" : "warning"} hint={`Target ${compactInr(targetAmount)}`} />
@@ -307,7 +307,7 @@ function MyReportPage() {
       {isLoading ? <p className="mt-4 text-sm text-muted-foreground">Loading report…</p> : null}
 
       <Tabs defaultValue="type" className="mt-5">
-        <TabsList className="grid w-full grid-cols-3">
+        <TabsList>
           <TabsTrigger value="type">Sales</TabsTrigger>
           <TabsTrigger value="attendance">Attendance</TabsTrigger>
           <TabsTrigger value="salary">Salary</TabsTrigger>

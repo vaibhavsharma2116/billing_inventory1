@@ -33,7 +33,7 @@ export async function fetchAdminPanel() {
         .order("created_at", { ascending: false }),
       supabase.from("csas").select("id, name, city, state, phone, email").order("name"),
       supabase.from("distributors").select("id, name, city, state, outstanding, phone, email").order("name"),
-      (supabase.from("retailers") as any).select("id, name, city, state, area, pincode, outstanding, credit_limit, retailer_type, phone").order("name"),
+      (supabase.from("retailers") as any).select("id, name, city, state, area, pincode, outstanding, credit_limit, retailer_type, phone, email").order("name"),
       supabase.from("profiles").select("id, full_name, phone, designation, employee_code"),
       supabase.from("attendance").select("user_id, punch_in, punch_out, work_date, location_label").order("work_date", { ascending: false }),
       supabase
@@ -142,7 +142,7 @@ export function buildAdminReports(data: AdminPanel): Record<string, AdminReport>
       rows: data.distributors.map((d) => ({
         key: d.id,
         label: d.name,
-        sub: `${d.city ?? "—"}, ${d.state ?? "—"}${d.phone ? ` • ${d.phone}` : ""}`,
+        sub: `${d.city ?? "—"}, ${d.state ?? "—"}${d.phone ? ` • ${d.phone}` : ""}${d.email ? ` • ${d.email}` : ""}`,
         value: inr(d.outstanding),
         city: d.city,
       })),
@@ -155,7 +155,7 @@ export function buildAdminReports(data: AdminPanel): Record<string, AdminReport>
         return {
           key: r.id,
           label: r.name,
-          sub: `${r.retailer_type ?? "—"} • ${r.city ?? "—"}${r.area ? `, ${r.area}` : ""}${r.pincode ? ` - ${r.pincode}` : ""}${r.phone ? ` • ${r.phone}` : ""}`,
+          sub: `${r.retailer_type ?? "—"} • ${r.city ?? "—"}${r.area ? `, ${r.area}` : ""}${r.pincode ? ` - ${r.pincode}` : ""}${r.phone ? ` • ${r.phone}` : ""}${r.email ? ` • ${r.email}` : ""}`,
           value: inr(r.outstanding),
           city: r.city,
           area: r.area,

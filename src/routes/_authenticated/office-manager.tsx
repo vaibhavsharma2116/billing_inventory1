@@ -209,7 +209,7 @@ function OfficeManagerPage() {
       subtitle="Task assignment, completion tracking & performance ratings"
       nav={[{ to: "/office-manager", label: "Team", icon: Users }]}
     >
-      <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 md:grid-cols-4">
         <StatCard label="Office employees" value={String(employees.length)} />
         <StatCard label="Tasks today" value={String(todaysTasks.length)} tone="primary" />
         <StatCard label="Completed today" value={String(doneToday)} tone="success" />

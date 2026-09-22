@@ -283,13 +283,13 @@ function DistributorPage() {
           : "Orders • Billing • Stock • CSA"
       }
     >
-      <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 md:grid-cols-4">
         <StatCard label="Total Orders" value={String(orders.length)} onClick={() => openReport("orders")} />
         <StatCard label="Pending Orders" value={String(pending.length)} tone="warning" onClick={() => openReport("pending")} />
         <StatCard label="Billing" value={compactInr(todayBilling)} tone="primary" onClick={() => openReport("billing")} />
         <StatCard label="Outstanding" value={compactInr(outstanding)} tone="danger" onClick={() => openReport("outstanding")} />
       </div>
-      <div className="mt-3 grid grid-cols-2 gap-3 md:grid-cols-4">
+      <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-3 md:grid-cols-4">
         <StatCard label="Stock Value" value={compactInr(stockValue)} tone="success" onClick={() => openReport("stockValue")} />
         <StatCard label="Invoices" value={String(data?.invoices.length ?? 0)} onClick={() => openReport("invoices")} />
         <StatCard label="Low Stock SKUs" value={String(lowStock.length)} tone="warning" onClick={() => openReport("lowStock")} />

@@ -137,7 +137,7 @@ function AdminCsaDetailPage() {
         </div>
       </Section>
 
-      <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 md:grid-cols-4">
         <StatCard label="Total billing" value={inr(totalBilling)} />
         <StatCard label="Live stock value" value={inr(stockValue)} />
         <StatCard label="Payments received" value={inr(received)} />

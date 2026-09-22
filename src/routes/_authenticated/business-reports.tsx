@@ -289,7 +289,7 @@ function BusinessReportsPage() {
         </Button>
       </div>
 
-      <div className="mt-4 grid grid-cols-2 gap-3 md:grid-cols-4">
+      <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-3 md:grid-cols-4">
         <StatCard label="Sales (Secondary)" value={compactInr(totals.sales)} tone="success" hint={`${sales.length} orders`} onClick={() => openCard("sales")} />
         <StatCard label="Purchase (Primary)" value={compactInr(totals.purchase)} tone="primary" hint={`${purchases.length} orders`} onClick={() => openCard("purchase")} />
         <StatCard label="GST Collected" value={compactInr(totals.gst)} tone="warning" hint={`${invoices.length} invoices`} onClick={() => openCard("gst")} />
@@ -318,7 +318,7 @@ function BusinessReportsPage() {
       </Section>
 
       <Tabs defaultValue="area" className="mt-6">
-        <TabsList className="flex-wrap">
+        <TabsList>
           <TabsTrigger value="area">Area-wise</TabsTrigger>
           <TabsTrigger value="city">City-wise</TabsTrigger>
           <TabsTrigger value="outlet">Outlet-wise</TabsTrigger>

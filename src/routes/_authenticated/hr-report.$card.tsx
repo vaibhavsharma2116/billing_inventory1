@@ -259,7 +259,7 @@ function HrReportPage() {
       </div>
 
       {report ? (
-        <div className="mt-4 grid grid-cols-3 gap-3">
+        <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
           {report.summary.map((s) => (
             <StatCard key={s.label} label={s.label} value={s.value} />
           ))}

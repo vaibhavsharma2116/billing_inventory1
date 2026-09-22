@@ -146,7 +146,7 @@ function CsaPage() {
 
   return (
     <Shell title="CSA / Super Stockist" subtitle="Distributor orders • stock • dispatch">
-      <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 md:grid-cols-4">
         <StatCard label="Pending Orders" value={String(pending.length)} tone="warning" onClick={() => navigate({ to: "/csa-report/$card", params: { card: "pending" } })} />
         <StatCard label="Distributors" value={String(data?.distributors.length ?? 0)} onClick={() => navigate({ to: "/csa-report/$card", params: { card: "distributors" } })} />
         <StatCard label="Stock Value" value={compactInr(stockValue)} tone="success" onClick={() => navigate({ to: "/csa-report/$card", params: { card: "stock" } })} />

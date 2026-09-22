@@ -252,7 +252,7 @@ export function ProductManager() {
               <Label htmlFor="p-name">Product name *</Label>
               <Input id="p-name" value={form.name} onChange={set("name")} placeholder="Matte Lipstick" />
             </div>
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div className="grid gap-1.5">
                 <Label htmlFor="p-pack">Packing size</Label>
                 <Input id="p-pack" value={form.packing_size} onChange={set("packing_size")} placeholder="12 pcs / box" />
@@ -262,7 +262,7 @@ export function ProductManager() {
                 <Input id="p-sku" value={form.sku} onChange={set("sku")} placeholder="PPK-LIP-001" />
               </div>
             </div>
-            <div className="grid grid-cols-3 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
               <div className="grid gap-1.5">
                 <Label htmlFor="p-hsn">HSN code</Label>
                 <Input id="p-hsn" value={form.hsn} onChange={set("hsn")} />
@@ -276,7 +276,7 @@ export function ProductManager() {
                 <Input id="p-cat" value={form.category} onChange={set("category")} />
               </div>
             </div>
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div className="grid gap-1.5">
                 <Label htmlFor="p-mrp">MRP</Label>
                 <Input id="p-mrp" inputMode="decimal" value={form.mrp} onChange={set("mrp")} />
@@ -286,7 +286,7 @@ export function ProductManager() {
                 <Input id="p-ptr" inputMode="decimal" value={form.ptr} onChange={set("ptr")} />
               </div>
             </div>
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div className="grid gap-1.5">
                 <Label htmlFor="p-pts">Distributor rate</Label>
                 <Input id="p-pts" inputMode="decimal" value={form.pts} onChange={set("pts")} />

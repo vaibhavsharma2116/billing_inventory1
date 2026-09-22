@@ -155,7 +155,7 @@ function CompanyPurchasePage() {
         </div>
       </Section>
 
-      <div className="grid grid-cols-3 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
         <StatCard label="SKUs selected" value={String(selected.length)} />
         <StatCard label="Total qty" value={String(selected.reduce((s, l) => s + l.qty, 0))} />
         <StatCard label="Order value" value={inr(total)} tone="primary" />

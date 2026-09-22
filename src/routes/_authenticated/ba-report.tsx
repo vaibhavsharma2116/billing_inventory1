@@ -278,7 +278,7 @@ function BaReportPage() {
         </Button>
       </div>
 
-      <div className="mt-3 grid grid-cols-2 gap-3">
+      <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-3">
         <StatCard label="Counter Sale" value={compactInr(totalSale)} tone="primary" hint={`${totalUnits} pcs`} />
         <StatCard label="Target" value={compactInr(targetAmount)} hint={monthLabel} />
         <StatCard
@@ -294,7 +294,7 @@ function BaReportPage() {
       {isLoading ? <p className="mt-4 text-sm text-muted-foreground">Loading report…</p> : null}
 
       <Tabs defaultValue="sales" className="mt-5">
-        <TabsList className="grid w-full grid-cols-4">
+        <TabsList>
           <TabsTrigger value="sales">Sales</TabsTrigger>
           <TabsTrigger value="target">Target</TabsTrigger>
           <TabsTrigger value="attendance">Attendance</TabsTrigger>

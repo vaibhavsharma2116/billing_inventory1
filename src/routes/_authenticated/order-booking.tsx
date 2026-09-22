@@ -333,7 +333,7 @@ function OrderBooking() {
 
 
       {retailer ? (
-        <div className="mt-4 grid grid-cols-2 gap-3 md:grid-cols-4">
+        <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-3 md:grid-cols-4">
           <StatCard label="Outstanding" value={inr(retailer.outstanding)} tone="danger" hint="Tap for detail" onClick={() => setDetail("outstanding")} />
           <StatCard label="Order Value" value={inr(net)} tone="primary" hint="Tap for detail" onClick={() => setDetail("order_value")} />
         </div>

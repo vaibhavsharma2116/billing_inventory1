@@ -234,20 +234,20 @@ function AdminPage() {
         { to: "/hr", label: "HR & Payroll" },
       ]}
     >
-      <div className="grid grid-cols-2 gap-3 md:grid-cols-3">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 md:grid-cols-3">
         <StatCard label="Primary Sales" value={compactInr(primary)} tone="primary" onClick={() => openReport("primary-sales")} />
         <StatCard label="Secondary Sales" value={compactInr(secondary)} tone="success" onClick={() => openReport("secondary-sales")} />
         <StatCard label="Collection" value={compactInr(collection)} tone="warning" onClick={() => openReport("collection")} />
       </div>
 
-      <div className="mt-3 grid grid-cols-2 gap-3 md:grid-cols-4">
+      <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-3 md:grid-cols-4">
         <StatCard label="CSA" value={String(data?.csas.length ?? 0)} onClick={() => openReport("csas")} />
         <StatCard label="Distributors" value={String(data?.distributors.length ?? 0)} onClick={() => openReport("distributors")} />
         <StatCard label="Retailers" value={String(data?.retailers.length ?? 0)} onClick={() => openReport("retailers")} />
         <StatCard label="Employees" value={String(data?.profiles.length ?? 0)} onClick={() => openReport("employees")} />
       </div>
 
-      <div className="mt-3 grid grid-cols-2 gap-3 md:grid-cols-4">
+      <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-3 md:grid-cols-4">
         <StatCard label="Team Present" value={String(present)} tone="success" onClick={() => openReport("team-present")} />
         <StatCard label="Pending Orders" value={String(orders.filter((o: any) => o.status === "pending").length)} tone="warning" onClick={() => openReport("pending-orders")} />
         <StatCard label="Low Stock SKUs" value={String(lowStock)} tone="danger" onClick={() => openReport("low-stock")} />

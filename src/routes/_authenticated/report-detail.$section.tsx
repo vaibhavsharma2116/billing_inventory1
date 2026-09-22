@@ -277,7 +277,7 @@ function ReportDetailPage() {
         </div>
       </div>
 
-      <div className="mt-4 grid grid-cols-2 gap-3 md:grid-cols-4">
+      <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-3 md:grid-cols-4">
         {table.stats.map((s) => (
           <StatCard key={s.label} label={s.label} value={s.value} />
         ))}

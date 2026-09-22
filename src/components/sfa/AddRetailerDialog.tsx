@@ -112,7 +112,7 @@ export function AddRetailerDialog({ invalidateKeys = [] }: { invalidateKeys?: st
             <Label htmlFor="r-name">Shop name *</Label>
             <Input id="r-name" value={form.name} onChange={set("name")} placeholder="Sharma Cosmetics" />
           </div>
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div className="grid gap-1.5">
               <Label htmlFor="r-owner">Owner</Label>
               <Input id="r-owner" value={form.owner_name} onChange={set("owner_name")} />
@@ -126,7 +126,7 @@ export function AddRetailerDialog({ invalidateKeys = [] }: { invalidateKeys?: st
             <Label htmlFor="r-address">Address</Label>
             <Input id="r-address" value={form.address} onChange={set("address")} />
           </div>
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div className="grid gap-1.5">
               <Label htmlFor="r-city">City</Label>
               <Input id="r-city" value={form.city} onChange={set("city")} />
@@ -136,7 +136,7 @@ export function AddRetailerDialog({ invalidateKeys = [] }: { invalidateKeys?: st
               <Input id="r-state" value={form.state} onChange={set("state")} />
             </div>
           </div>
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div className="grid gap-1.5">
               <Label htmlFor="r-area">Area</Label>
               <Input id="r-area" value={form.area} onChange={set("area")} />
@@ -146,7 +146,7 @@ export function AddRetailerDialog({ invalidateKeys = [] }: { invalidateKeys?: st
               <Input id="r-pincode" inputMode="numeric" value={form.pincode} onChange={set("pincode")} />
             </div>
           </div>
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div className="grid gap-1.5">
               <Label htmlFor="r-email">Email</Label>
               <Input id="r-email" type="email" value={form.email} onChange={set("email")} />
@@ -156,7 +156,7 @@ export function AddRetailerDialog({ invalidateKeys = [] }: { invalidateKeys?: st
             <Label htmlFor="r-gstin">GSTIN</Label>
             <Input id="r-gstin" value={form.gstin} onChange={set("gstin")} />
           </div>
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div className="grid gap-1.5">
               <Label htmlFor="r-margin">Retail margin %</Label>
               <Input id="r-margin" inputMode="decimal" value={form.margin_pct} onChange={set("margin_pct")} />

@@ -240,7 +240,7 @@ function SalesmanPage() {
         </div>
       )}
 
-      <div className="mt-4 grid grid-cols-2 gap-3 md:grid-cols-4">
+      <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-3 md:grid-cols-4">
         <StatCard label="Monthly Visit Target" value={visitsTarget ? `${data?.monthVisits ?? 0}/${visitsTarget}` : "—"} onClick={() => navigate({ to: "/salesman-report/$card", params: { card: "plan" } })} />
         <StatCard
           label="Visits Completed"

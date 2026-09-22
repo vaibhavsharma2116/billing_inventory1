@@ -106,7 +106,7 @@ function Row({
         </div>
       </div>
       {open && details ? (
-        <div className="grid grid-cols-2 gap-2 border-t border-border/60 bg-muted/30 p-3 sm:grid-cols-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 border-t border-border/60 bg-muted/30 p-3 sm:grid-cols-3">
           {details.map((d) => (
             <div key={d.k}>
               <p className="text-[10px] uppercase tracking-wider text-muted-foreground">{d.k}</p>
@@ -367,7 +367,7 @@ function ReportsPage() {
         ))}
       </div>
 
-      <div className="mt-4 grid grid-cols-2 gap-3 md:grid-cols-4">
+      <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-3 md:grid-cols-4">
         <StatCard
           label="Primary Sales"
           value={compactInr(totals.primary)}
@@ -393,7 +393,7 @@ function ReportsPage() {
 
       {card ? (
         <Section title={`${cardDetail.title} — brief detail`}>
-          <div className="grid grid-cols-2 gap-3 p-4 sm:grid-cols-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 p-4 sm:grid-cols-4">
             {cardDetail.stats.map((s) => (
               <div key={s.k}>
                 <p className="text-[10px] uppercase tracking-wider text-muted-foreground">{s.k}</p>
@@ -433,7 +433,7 @@ function ReportsPage() {
       </Section>
 
       <Tabs defaultValue="distributor" className="mt-6">
-        <TabsList className="flex-wrap">
+        <TabsList>
           <TabsTrigger value="distributor">Distributor-wise</TabsTrigger>
           <TabsTrigger value="area">Area-wise</TabsTrigger>
           <TabsTrigger value="city">City Network</TabsTrigger>
