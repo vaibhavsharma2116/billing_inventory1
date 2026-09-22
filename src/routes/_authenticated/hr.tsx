@@ -148,6 +148,31 @@ function HrPage() {
   const [from, setFrom] = useState(monthStart());
   const [to, setTo] = useState(todayStr());
   const [salaryFor, setSalaryFor] = useState<string | null>(null);
+  const [calEmp, setCalEmp] = useState<string>("");
+  const [calMonth, setCalMonth] = useState<string>(() => {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+  });
+
+  // Separate lightweight query for calendar view
+  const { data: calData } = useQuery({
+    queryKey: ["att-calendar", calEmp, calMonth],
+    enabled: !!calEmp,
+    queryFn: async () => {
+      const yrStr = calMonth.split("-")[0] ?? "2026";
+      const moStr = calMonth.split("-")[1] ?? "01";
+      const yr = Number(yrStr);
+      const mo = Number(moStr);
+      const prev = new Date(yr, mo - 2, 1);
+      const start = `${prev.getFullYear()}-${String(prev.getMonth() + 1).padStart(2, "0")}-01`;
+      const end = `${yr}-${String(mo).padStart(2, "0")}-31`;
+      const [att, leavs] = await Promise.all([
+        supabase.from("attendance").select("work_date, punch_in, punch_out").eq("user_id", calEmp).gte("work_date", start).lte("work_date", end),
+        supabase.from("leaves").select("leave_type, from_date, to_date, status").eq("user_id", calEmp).eq("status", "approved").gte("to_date", start),
+      ]);
+      return { attendance: att.data ?? [], leaves: leavs.data ?? [] };
+    },
+  });
 
   const { data, isLoading } = useQuery({
     queryKey: ["hr-workspace", from, to, attDate],
@@ -212,7 +237,7 @@ function HrPage() {
   const pendingLeaves = (data?.leaves ?? []).filter((l) => l.status === "pending");
   const pendingExpenses = (data?.expenses ?? []).filter((e) => e.status === "pending");
   const cityOf = (id: string | null | undefined) => (id ? detailOf(id)?.city ?? "" : "");
-  const [attView, setAttView] = useState<"records" | "absent">("records");
+  const [attView, setAttView] = useState<"records" | "absent" | "calendar">("records");
   const attCities = useMemo(
     () =>
       Array.from(new Set((data?.details ?? []).map((d) => d.city?.trim()).filter((c): c is string => !!c))).sort(),
@@ -556,12 +581,15 @@ function HrPage() {
             <div className="flex flex-wrap items-end gap-3 border-b border-border/60 p-3">
               <div className="space-y-1.5">
                 <Label>Panel</Label>
-                <div className="flex gap-1">
+                <div className="flex flex-wrap gap-1">
                   <Button size="sm" variant={attView === "records" ? "default" : "outline"} onClick={() => setAttView("records")}>
                     Punch records
                   </Button>
                   <Button size="sm" variant={attView === "absent" ? "default" : "outline"} onClick={() => setAttView("absent")}>
-                    Absent employees ({absentRows.length})
+                    Absent ({absentRows.length})
+                  </Button>
+                  <Button size="sm" variant={attView === "calendar" ? "default" : "outline"} onClick={() => setAttView("calendar")}>
+                    📅 Calendar
                   </Button>
                 </div>
               </div>
@@ -606,7 +634,162 @@ function HrPage() {
               )}
             </div>
             <div className="divide-y divide-border/60">
-              {attView === "absent" ? (
+              {attView === "calendar" ? (
+                <div className="p-3 space-y-4">
+                  {/* Employee + Month selectors */}
+                  <div className="flex flex-wrap gap-3 items-end">
+                    <div className="space-y-1.5">
+                      <Label>Employee</Label>
+                      <select
+                        className="h-9 rounded-md border border-input bg-background px-3 text-sm min-w-[180px]"
+                        value={calEmp}
+                        onChange={(e) => setCalEmp(e.target.value)}
+                      >
+                        <option value="">— Select employee —</option>
+                        {profiles.map((p) => (
+                          <option key={p.id} value={p.id}>{p.full_name}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label>Month</Label>
+                      <div className="flex gap-1 items-center">
+                        <Button size="sm" variant="outline" onClick={() => {
+                          const [yrStr2, moStr2] = calMonth.split("-");
+                          const yr2 = Number(yrStr2 ?? "2026");
+                          const mo2 = Number(moStr2 ?? "1");
+                          const d = new Date(yr2, mo2 - 2, 1);
+                          setCalMonth(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`);
+                        }}>←</Button>
+                        <input
+                          type="month"
+                          className="h-9 rounded-md border border-input bg-background px-3 text-sm"
+                          value={calMonth}
+                          max={todayStr().slice(0, 7)}
+                          onChange={(e) => setCalMonth(e.target.value)}
+                        />
+                        <Button size="sm" variant="outline" onClick={() => {
+                          const [yrStr3, moStr3] = calMonth.split("-");
+                          const yr3 = Number(yrStr3 ?? "2026");
+                          const mo3 = Number(moStr3 ?? "1");
+                          const d = new Date(yr3, mo3, 1);
+                          const next = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+                          if (next <= todayStr().slice(0, 7)) setCalMonth(next);
+                        }}>→</Button>
+                      </div>
+                    </div>
+                  </div>
+
+                  {!calEmp ? (
+                    <p className="text-sm text-muted-foreground py-4 text-center">Employee select karo calendar dekhne ke liye</p>
+                  ) : (() => {
+                    const yrStr4 = calMonth.split("-")[0] ?? "2026";
+                    const moStr4 = calMonth.split("-")[1] ?? "01";
+                    const yr = Number(yrStr4);
+                    const mo = Number(moStr4);
+                    const firstDay = new Date(yr, mo - 1, 1).getDay();
+                    const daysInMonth = new Date(yr, mo, 0).getDate();
+                    const today = todayStr();
+                    const attMap = new Map((calData?.attendance ?? []).map((a) => [a.work_date, a]));
+                    const getStatus = (dateStr: string) => {
+                      const dow = new Date(`${dateStr}T00:00:00`).getDay();
+                      if (dow === 0) return "sunday";
+                      if (dateStr > today) return "future";
+                      const att = attMap.get(dateStr);
+                      const leave = (calData?.leaves ?? []).find(
+                        (l) => l.from_date <= dateStr && l.to_date >= dateStr
+                      );
+                      if (att?.punch_in) {
+                        const isHalf = leave?.leave_type?.toLowerCase().includes("half");
+                        return isHalf ? "half" : "present";
+                      }
+                      if (leave) return "leave";
+                      return "absent";
+                    };
+                    const cells: (string | null)[] = [];
+                    for (let i = 0; i < firstDay; i++) cells.push(null);
+                    for (let d = 1; d <= daysInMonth; d++) {
+                      cells.push(`${calMonth}-${String(d).padStart(2, "0")}`);
+                    }
+                    const statusStyle: Record<string, string> = {
+                      present: "bg-green-500/20 text-green-700 dark:text-green-400 border-green-400/40",
+                      half: "bg-amber-400/20 text-amber-700 dark:text-amber-300 border-amber-400/40",
+                      absent: "bg-red-500/15 text-red-700 dark:text-red-400 border-red-400/30",
+                      leave: "bg-blue-500/15 text-blue-700 dark:text-blue-400 border-blue-400/30",
+                      sunday: "bg-muted/40 text-muted-foreground border-transparent",
+                      future: "bg-background text-muted-foreground/50 border-border/30",
+                    };
+                    const statusLabel: Record<string, string> = {
+                      present: "P", half: "½", absent: "A", leave: "L", sunday: "—", future: "",
+                    };
+                    const monthName = new Date(yr, mo - 1, 1).toLocaleDateString("en-IN", { month: "long", year: "numeric" });
+                    // Summary counts
+                    const allDates = Array.from({ length: daysInMonth }, (_, i) => `${calMonth}-${String(i + 1).padStart(2, "0")}`);
+                    const counts = allDates.reduce((acc, d) => { const s = getStatus(d); acc[s] = (acc[s] || 0) + 1; return acc; }, {} as Record<string, number>);
+                    return (
+                      <div className="space-y-3">
+                        <div className="flex items-center justify-between">
+                          <p className="font-semibold text-sm">{nameOf(calEmp)} — {monthName}</p>
+                          <div className="flex flex-wrap gap-2 text-xs">
+                            <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-full bg-green-500 inline-block" />Present {counts["present"] ?? 0}</span>
+                            <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-full bg-amber-400 inline-block" />Half Day {counts["half"] ?? 0}</span>
+                            <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-full bg-red-500 inline-block" />Absent {counts["absent"] ?? 0}</span>
+                            <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-full bg-blue-500 inline-block" />Leave {counts["leave"] ?? 0}</span>
+                          </div>
+                        </div>
+                        {/* Day headers */}
+                        <div className="grid grid-cols-7 gap-1 text-center">
+                          {["Su","Mo","Tu","We","Th","Fr","Sa"].map((d) => (
+                            <div key={d} className="text-[11px] font-semibold text-muted-foreground py-1">{d}</div>
+                          ))}
+                          {/* Calendar cells */}
+                          {cells.map((dateStr, i) => {
+                            if (!dateStr) return <div key={`empty-${i}`} />;
+                            const s = getStatus(dateStr);
+                            const dayNum = parseInt(dateStr.slice(8));
+                            const att = attMap.get(dateStr);
+                            const pinTime = att?.punch_in ? new Date(att.punch_in).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", hour12: true }) : null;
+                            const poutTime = att?.punch_out ? new Date(att.punch_out).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", hour12: true }) : null;
+                            return (
+                              <div
+                                key={dateStr}
+                                title={[
+                                  dateStr,
+                                  s === "present" ? `In: ${pinTime}${poutTime ? ` | Out: ${poutTime}` : " | Working"}` : "",
+                                  s === "half" ? `Half Day • In: ${pinTime}` : "",
+                                  s === "absent" ? "Absent" : "",
+                                  s === "leave" ? "On Leave" : "",
+                                ].filter(Boolean).join(" — ")}
+                                className={`rounded-lg border p-1 min-h-[42px] flex flex-col items-center justify-center cursor-default transition-all ${statusStyle[s]}`}
+                              >
+                                <span className="text-[11px] font-bold leading-none">{dayNum}</span>
+                                <span className="text-[10px] font-semibold mt-0.5 leading-none">{statusLabel[s]}</span>
+                              </div>
+                            );
+                          })}
+                        </div>
+                        {/* Punch details for present/half days */}
+                        {Array.from(attMap.values()).filter(a => a.punch_in).length > 0 && (
+                          <details className="mt-2">
+                            <summary className="text-xs text-muted-foreground cursor-pointer hover:text-foreground">Punch details ({Array.from(attMap.values()).filter(a => a.punch_in).length} days)</summary>
+                            <div className="mt-2 space-y-1 max-h-48 overflow-y-auto">
+                              {Array.from(attMap.values()).filter(a => a.punch_in).sort((a, b) => a.work_date.localeCompare(b.work_date)).map(a => (
+                                <div key={a.work_date} className="flex justify-between text-xs px-2 py-1 rounded bg-muted/40">
+                                  <span className="font-medium">{day(a.work_date)}</span>
+                                  <span className="text-muted-foreground tabular-nums">
+                                    In: {new Date(a.punch_in!).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", hour12: true })}
+                                    {a.punch_out ? ` · Out: ${new Date(a.punch_out).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", hour12: true })}` : " · Running"}
+                                  </span>
+                                </div>
+                              ))}
+                            </div>
+                          </details>
+                        )}
+                      </div>
+                    );
+                  })()}
+                </div>
+              ) : attView === "absent" ? (
                 absentRows.length === 0 ? (
                   <p className="p-4 text-sm text-muted-foreground">
                     {attMode === "day" ? "Is date koi employee absent nahi hai." : "Is range/city mein koi absent nahi hai."}
