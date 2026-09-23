@@ -165,7 +165,8 @@ function HrPage() {
       const mo = Number(moStr);
       const prev = new Date(yr, mo - 2, 1);
       const start = `${prev.getFullYear()}-${String(prev.getMonth() + 1).padStart(2, "0")}-01`;
-      const end = `${yr}-${String(mo).padStart(2, "0")}-31`;
+      const lastDay = new Date(yr, mo, 0).getDate();
+      const end = `${yr}-${String(mo).padStart(2, "0")}-${String(lastDay).padStart(2, "0")}`;
       const [att, leavs] = await Promise.all([
         supabase.from("attendance").select("work_date, punch_in, punch_out").eq("user_id", calEmp).gte("work_date", start).lte("work_date", end),
         supabase.from("leaves").select("leave_type, from_date, to_date, status").eq("user_id", calEmp).eq("status", "approved").gte("to_date", start),
