@@ -271,7 +271,17 @@ function HrPage() {
     );
     const rows: { id: string; name: string; city: string; dates: string[] }[] = [];
     for (const p of scopedProfiles) {
-      const missed = attDates.filter((d) => d <= todayStr() && !attendanceSet.has(`${p.id}|${d}`) && !onApprovedLeave(p.id, d));
+      const dObj = detailOf(p.id);
+      const doj = dObj?.date_of_joining;
+      const exitDate = dObj?.exit_date;
+      const missed = attDates.filter((d) => {
+        if (d > todayStr()) return false;
+        if (doj && d < doj) return false;
+        if (exitDate && d > exitDate) return false;
+        if (attendanceSet.has(`${p.id}|${d}`)) return false;
+        if (onApprovedLeave(p.id, d)) return false;
+        return true;
+      });
       if (missed.length) rows.push({ id: p.id, name: p.full_name ?? "Employee", city: cityOf(p.id) || "—", dates: missed });
     }
     return rows.sort((a, b) => b.dates.length - a.dates.length);
@@ -690,11 +700,16 @@ function HrPage() {
                     const firstDay = new Date(yr, mo - 1, 1).getDay();
                     const daysInMonth = new Date(yr, mo, 0).getDate();
                     const today = todayStr();
+                    const dObj = detailOf(calEmp);
+                    const doj = dObj?.date_of_joining;
+                    const exitDate = dObj?.exit_date;
                     const attMap = new Map((calData?.attendance ?? []).map((a) => [a.work_date, a]));
                     const getStatus = (dateStr: string) => {
                       const dow = new Date(`${dateStr}T00:00:00`).getDay();
                       if (dow === 0) return "sunday";
                       if (dateStr > today) return "future";
+                      if (doj && dateStr < doj) return "not_joined";
+                      if (exitDate && dateStr > exitDate) return "exited";
                       const att = attMap.get(dateStr);
                       const leave = (calData?.leaves ?? []).find(
                         (l) => l.from_date <= dateStr && l.to_date >= dateStr
@@ -718,9 +733,11 @@ function HrPage() {
                       leave: "bg-blue-500/15 text-blue-700 dark:text-blue-400 border-blue-400/30",
                       sunday: "bg-muted/40 text-muted-foreground border-transparent",
                       future: "bg-background text-muted-foreground/50 border-border/30",
+                      not_joined: "bg-muted/20 text-muted-foreground/40 border-dashed border-border/40",
+                      exited: "bg-muted/20 text-muted-foreground/40 border-dashed border-border/40",
                     };
                     const statusLabel: Record<string, string> = {
-                      present: "P", half: "½", absent: "A", leave: "L", sunday: "—", future: "",
+                      present: "P", half: "½", absent: "A", leave: "L", sunday: "—", future: "", not_joined: "NA", exited: "—",
                     };
                     const monthName = new Date(yr, mo - 1, 1).toLocaleDateString("en-IN", { month: "long", year: "numeric" });
                     // Summary counts

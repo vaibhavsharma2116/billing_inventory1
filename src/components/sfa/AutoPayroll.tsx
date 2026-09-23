@@ -84,7 +84,7 @@ export function AutoPayroll() {
           .gte("expense_date", from)
           .lte("expense_date", to),
         supabase.from("salary_structures").select("*").order("effective_from", { ascending: false }),
-        supabase.from("employee_details").select("user_id, date_of_joining"),
+        supabase.from("employee_details").select("user_id, date_of_joining, exit_date, status"),
       ]);
       const partyIds = new Set(
         (roles.data ?? [])
@@ -102,52 +102,72 @@ export function AutoPayroll() {
     },
   });
 
-  // Salary month is always 30 paid days; every Sunday is a paid weekly off.
-  const workingDays = 30;
+  // Salary month based on actual days; every Sunday is a paid weekly off.
+  const workingDays = days.length;
   const sundayCount = useMemo(() => days.filter(isSunday).length, [days]);
 
   const lines: PayrollLine[] = useMemo(() => {
     if (!data) return [];
-    return data.profiles.map((p) => {
+    const out: PayrollLine[] = [];
+    for (const p of data.profiles) {
+      const detail = data.details.find((d) => d.user_id === p.id);
+      const joiningDate = detail?.date_of_joining ?? null;
+      const exitDate = detail?.exit_date ?? null;
+      const isActive = detail?.status === "active";
+      
+      // If exited before this month, skip entirely
+      if (!isActive && exitDate && exitDate < from) continue;
+
       // Latest salary structure that is already effective within this month.
       const s = data.salaries
         .filter((r) => r["user_id"] === p.id && String(r["effective_from"] ?? "") <= to)
         .sort((a, b) => String(b["effective_from"] ?? "").localeCompare(String(a["effective_from"] ?? "")))[0];
       const salaryEffFrom = s ? String(s["effective_from"] ?? "") : null;
-      // Also check joining date — use whichever is later (salary effective date vs joining date)
-      const joiningDate = (data.details.find((d) => d.user_id === p.id)?.date_of_joining) ?? null;
+      
       const effectiveFrom = [salaryEffFrom, joiningDate]
         .filter((d): d is string => !!d && d >= from)
         .sort()
         .pop() ?? (salaryEffFrom && salaryEffFrom >= from ? salaryEffFrom : null);
-      // Mid-month joiners / mid-month salary changes are paid only from the effective date.
-      const eligibleDays = days.filter((d) => !effectiveFrom || d >= effectiveFrom);
-      const partMonth = !!effectiveFrom && eligibleDays.length < days.length;
+      
+      // Mid-month joiners / exiters
+      const eligibleDays = days.filter((d) => (!effectiveFrom || d >= effectiveFrom) && (!exitDate || d <= exitDate));
+      
+      if (eligibleDays.length === 0) continue; // safety check
+      
+      const partMonth = eligibleDays.length < days.length;
       const sundaySet = new Set(eligibleDays.filter(isSunday));
-      const paidBase = Math.max(Math.round((workingDays * eligibleDays.length) / days.length), 0);
+      const paidBase = eligibleDays.length;
 
-      // Sundays are always paid weekly offs — a punch on Sunday must NOT double-count
-      // as present (it is already included in sundaySet / paidLeaveDays).
-      const present = new Set(
-        data.attendance
-          .filter((a) => a.user_id === p.id && a.punch_in && eligibleDays.includes(a.work_date) && !isSunday(a.work_date))
-          .map((a) => a.work_date),
-      );
-      const leaveDates = new Set<string>();
-      for (const l of data.leaves) {
-        if (l.user_id !== p.id) continue;
-        for (const d of eligibleDays) {
-          if (d >= l.from_date && d <= l.to_date && !present.has(d) && !sundaySet.has(d)) leaveDates.add(d);
+      let presentCount = 0;
+      let halfLeaveCount = 0;
+      let fullLeaveCount = 0;
+      
+      for (const d of eligibleDays) {
+        if (sundaySet.has(d)) continue;
+        
+        const hasPunch = data.attendance.some(a => a.user_id === p.id && a.work_date === d && a.punch_in);
+        const l = data.leaves.find(l => l.user_id === p.id && l.status === "approved" && d >= l.from_date && d <= l.to_date);
+        const isHalf = l?.leave_type?.toLowerCase().includes("half");
+        
+        if (hasPunch) {
+          if (isHalf) {
+            presentCount += 0.5;
+            halfLeaveCount += 0.5;
+          } else {
+            presentCount += 1;
+          }
+        } else {
+          if (l) {
+            fullLeaveCount += 1;
+          }
         }
       }
-      const presentDays = present.size;
-      // Sundays are paid weekly offs; approved leaves are paid when enabled.
-      const paidLeaveDays = sundaySet.size + (payLeaves ? leaveDates.size : 0);
+
+      const presentDays = presentCount;
+      const paidLeaveDays = sundaySet.size + (payLeaves ? (fullLeaveCount + halfLeaveCount) : 0);
       const paidDays = Math.min(presentDays + paidLeaveDays, paidBase);
       const lopDays = Math.max(paidBase - paidDays, 0);
-      const absentDays = eligibleDays.filter(
-        (d) => !present.has(d) && !sundaySet.has(d) && !leaveDates.has(d),
-      ).length;
+      const absentDays = eligibleDays.length - sundaySet.size - presentCount - fullLeaveCount - halfLeaveCount;
 
       const gross =
         num(s?.["basic"]) +
@@ -164,7 +184,8 @@ export function AutoPayroll() {
         ? data.expenses.filter((e) => e.user_id === p.id).reduce((t, e) => t + Number(e.total_amount ?? 0), 0)
         : 0;
       const net = Math.max(earnedGross - deductions, 0) + reimbursement;
-      return {
+      
+      out.push({
         userId: p.id,
         name: p.full_name,
         code: p.employee_code ?? "—",
@@ -182,9 +203,10 @@ export function AutoPayroll() {
         reimbursement,
         net,
         hasStructure: !!s,
-      };
-    });
-  }, [data, days, to, workingDays, payLeaves, addReimbursement]);
+      });
+    }
+    return out;
+  }, [data, days, from, to, workingDays, payLeaves, addReimbursement]);
 
   const payable = lines.filter((l) => l.hasStructure);
   const totalNet = payable.reduce((s, l) => s + l.net, 0);

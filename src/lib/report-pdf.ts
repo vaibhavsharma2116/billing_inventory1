@@ -37,7 +37,7 @@ export async function downloadReportPdf(data: ReportPdfData) {
 
   doc.setFont("helvetica", "bold");
   doc.setFontSize(18);
-  doc.text("POPPiK", L, y);
+  doc.text("Poppik Lifestyle Private Limited", L, y);
   doc.setFontSize(11);
   doc.setFont("helvetica", "normal");
   doc.text(data.title, R, y, { align: "right" });
