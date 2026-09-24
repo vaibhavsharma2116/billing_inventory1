@@ -8,9 +8,14 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { inr } from "@/lib/sfa";
+
+const monthStart = () => new Date().toISOString().slice(0, 8) + "01";
+const todayStr = () => new Date().toISOString().slice(0, 10);
 import { downloadReportPdf, rs } from "@/lib/report-pdf";
 import { MarginBudget } from "@/components/sfa/MarginBudget";
 import { TargetAssign } from "@/components/sfa/TargetAssign";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 
 export const Route = createFileRoute("/_authenticated/manager")({
   head: () => ({
@@ -35,10 +40,12 @@ export const Route = createFileRoute("/_authenticated/manager")({
 function ManagerDashboard() {
   const { data: me } = useMe();
   const [card, setCard] = useState<string | null>(null);
+  const [from, setFrom] = useState(monthStart());
+  const [to, setTo] = useState(todayStr());
 
 
   const { data, isLoading } = useQuery({
-    queryKey: ["manager-scope", me?.profile?.id ?? null],
+    queryKey: ["manager-scope", me?.profile?.id ?? null, from, to],
     enabled: !!me?.profile?.id,
     queryFn: async () => {
       const managerId = me!.profile!.id;
@@ -49,12 +56,21 @@ function ManagerDashboard() {
         supabase
           .from("orders")
           .select("id, order_no, kind, status, total_amount, created_at, distributor_id, csa_id, retailer_id, salesman_id, depot_id")
-          .order("created_at", { ascending: false })
-          .limit(500),
-        supabase.from("collections").select("id, amount, mode, created_at, retailer_id, salesman_id"),
-        supabase.from("visits").select("id, salesman_id, retailer_id, productive, checked_in_at"),
-        supabase.from("attendance").select("id, user_id, work_date, punch_in, punch_out"),
-        supabase.from("ba_sales").select("id, ba_id, amount, qty, sale_date"),
+          .gte("created_at", `${from}T00:00:00`)
+          .lte("created_at", `${to}T23:59:59`)
+          .order("created_at", { ascending: false }),
+        supabase.from("collections").select("id, amount, mode, created_at, retailer_id, salesman_id")
+          .gte("created_at", `${from}T00:00:00`)
+          .lte("created_at", `${to}T23:59:59`),
+        supabase.from("visits").select("id, salesman_id, retailer_id, productive, checked_in_at")
+          .gte("checked_in_at", `${from}T00:00:00`)
+          .lte("checked_in_at", `${to}T23:59:59`),
+        supabase.from("attendance").select("id, user_id, work_date, punch_in, punch_out")
+          .gte("work_date", from)
+          .lte("work_date", to),
+        supabase.from("ba_sales").select("id, ba_id, amount, qty, sale_date")
+          .gte("sale_date", from)
+          .lte("sale_date", to),
         supabase.from("profiles").select("id, full_name, phone, designation, distributor_id, csa_id, depot_id, reports_to"),
         supabase.from("manager_assignments").select("manager_id, distributor_id, csa_id, member_id"),
         supabase.from("depots").select("id, name, city, state"),
@@ -366,6 +382,20 @@ function ManagerDashboard() {
       title="Manager Reports"
       subtitle={`${me?.profile?.full_name ?? "Manager"} · ${me?.role ? roleLabel[me.role] : ""}`}
     >
+      <div className="mb-4 flex flex-wrap items-end gap-3 rounded-2xl border border-border/60 bg-card p-4">
+        <div className="space-y-1.5">
+          <Label>From</Label>
+          <Input type="date" value={from} onChange={(e) => setFrom(e.target.value)} />
+        </div>
+        <div className="space-y-1.5">
+          <Label>To</Label>
+          <Input type="date" value={to} onChange={(e) => setTo(e.target.value)} />
+        </div>
+        <p className="pb-2 text-xs text-muted-foreground flex-1">
+          Date filter applies to orders, visits, attendance, collections, and BA sales. Outstanding balances are live.
+        </p>
+      </div>
+
       {isLoading ? (
         <p className="text-sm text-muted-foreground">Loading your team reports…</p>
       ) : (
