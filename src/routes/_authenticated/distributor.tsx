@@ -205,7 +205,10 @@ function DistributorPage() {
   const orders = data?.orders ?? [];
   const pending = orders.filter((o) => o.status === "pending");
   const todayBilling = (data?.invoices ?? []).reduce((s, i) => s + Number(i.net_amount), 0);
-  const stockValue = (data?.stock ?? []).reduce(
+  
+  const activeStock = (data?.stock ?? []).filter((s) => s.physical_qty > 0 || s.reserved_qty > 0);
+  
+  const stockValue = activeStock.reduce(
     (s, r) => s + r.physical_qty * Number((r.products as { ptr: number } | null)?.ptr ?? 0),
     0,
   );
@@ -213,7 +216,7 @@ function DistributorPage() {
   const todayStr = new Date().toISOString().slice(0, 10);
   const todayOrders = orders.filter((o) => String(o.created_at).slice(0, 10) === todayStr);
   const openOrders = orders.filter((o) => o.status !== "invoiced" && o.status !== "rejected");
-  const lowStock = (data?.stock ?? []).filter((s) => s.physical_qty - s.reserved_qty <= 10);
+  const lowStock = activeStock.filter((s) => s.physical_qty - s.reserved_qty <= 10);
 
   const openReport = (card: string) => navigate({ to: "/distributor-report/$card", params: { card } });
 
@@ -594,12 +597,15 @@ function DistributorPage() {
             }
           >
             <div className="divide-y divide-border/60">
-              {(data?.stock ?? []).map((s) => {
-                const available = s.physical_qty - s.reserved_qty;
-                return (
-                  <div key={s.id} className="flex items-center justify-between p-3 text-sm">
-                    <div>
-                      <p className="font-medium">{(s.products as { name: string } | null)?.name}</p>
+              {activeStock.length === 0 ? (
+                <p className="p-4 text-center text-sm text-muted-foreground">No active stock available.</p>
+              ) : (
+                activeStock.map((s) => {
+                  const available = s.physical_qty - s.reserved_qty;
+                  return (
+                    <div key={s.id} className="flex items-center justify-between p-3 text-sm">
+                      <div>
+                        <p className="font-medium">{(s.products as { name: string } | null)?.name}</p>
                       <p className="text-[11px] text-muted-foreground">
                         Batch {s.batch_no} • Exp {s.expiry_date}
                       </p>
@@ -612,7 +618,7 @@ function DistributorPage() {
                     </div>
                   </div>
                 );
-              })}
+              }))}
             </div>
           </Section>
         </TabsContent>
