@@ -332,7 +332,7 @@ function NewPartyDialog({
       if (level === "depot") {
         const { data, error } = await supabase
           .from("csas")
-          .insert({ ...base, depot_id: ownerId })
+          .insert({ ...base, depot_id: ownerId, created_by: me?.id })
           .select("id")
           .single();
         if (error) throw error;
@@ -341,7 +341,7 @@ function NewPartyDialog({
       if (level === "csa") {
         const { data, error } = await supabase
           .from("distributors")
-          .insert({ ...base, csa_id: ownerId })
+          .insert({ ...base, csa_id: ownerId, created_by: me?.id })
           .select("id")
           .single();
         if (error) throw error;
@@ -349,7 +349,7 @@ function NewPartyDialog({
       }
       const { data, error } = await supabase
         .from("retailers")
-        .insert({ ...base, distributor_id: ownerId, retailer_type: "no_ba" })
+        .insert({ ...base, distributor_id: ownerId, retailer_type: "no_ba", created_by: me?.id })
         .select("id")
         .single();
       if (error) throw error;
