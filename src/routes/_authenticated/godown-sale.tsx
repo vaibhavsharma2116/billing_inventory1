@@ -303,7 +303,7 @@ function NewPartyDialog({
   label: string;
   onCreated: (id: string) => void | Promise<void>;
 }) {
-  const { data: me } = useMe();
+  const { userId } = useMe();
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState({
     name: "",
@@ -350,7 +350,7 @@ function NewPartyDialog({
       }
       const { data, error } = await supabase
         .from("retailers")
-        .insert({ ...base, distributor_id: ownerId, retailer_type: "no_ba", created_by: me?.id })
+        .insert({ ...base, distributor_id: ownerId, retailer_type: "no_ba", created_by: userId })
         .select("id")
         .single();
       if (error) throw error;
