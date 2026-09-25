@@ -350,7 +350,7 @@ function NewPartyDialog({
       const newId = crypto.randomUUID();
       const { error } = await supabase
         .from("retailers")
-        .insert({ id: newId, ...base, margin_pct: Number(form.margin_pct) || 0, distributor_id: ownerId, retailer_type: "no_ba", created_by: userId });
+        .insert({ id: newId, ...base, margin_pct: Number(form.margin_pct) || 0, distributor_id: ownerId, retailer_type: "no_ba", created_by: userId ?? null });
       if (error) throw error;
       return newId;
     },
