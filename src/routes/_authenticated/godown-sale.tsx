@@ -331,30 +331,27 @@ function NewPartyDialog({
         state: form.state.trim() || null,
       };
       if (level === "depot") {
-        const { data, error } = await supabase
+        const newId = crypto.randomUUID();
+        const { error } = await supabase
           .from("csas")
-          .insert({ ...base, depot_id: ownerId })
-          .select("id")
-          .single();
+          .insert({ id: newId, ...base, depot_id: ownerId });
         if (error) throw error;
-        return data.id;
+        return newId;
       }
       if (level === "csa") {
-        const { data, error } = await supabase
+        const newId = crypto.randomUUID();
+        const { error } = await supabase
           .from("distributors")
-          .insert({ ...base, csa_id: ownerId })
-          .select("id")
-          .single();
+          .insert({ id: newId, ...base, csa_id: ownerId });
         if (error) throw error;
-        return data.id;
+        return newId;
       }
-      const { data, error } = await supabase
+      const newId = crypto.randomUUID();
+      const { error } = await supabase
         .from("retailers")
-        .insert({ ...base, distributor_id: ownerId, retailer_type: "no_ba", created_by: userId })
-        .select("id")
-        .single();
+        .insert({ id: newId, ...base, distributor_id: ownerId, retailer_type: "no_ba", created_by: userId });
       if (error) throw error;
-      return data.id;
+      return newId;
     },
     onSuccess: async (id) => {
       toast.success("Party created");
