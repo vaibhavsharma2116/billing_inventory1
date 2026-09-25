@@ -303,6 +303,7 @@ function NewPartyDialog({
   label: string;
   onCreated: (id: string) => void | Promise<void>;
 }) {
+  const { data: me } = useMe();
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState({
     name: "",
@@ -332,7 +333,7 @@ function NewPartyDialog({
       if (level === "depot") {
         const { data, error } = await supabase
           .from("csas")
-          .insert({ ...base, depot_id: ownerId, created_by: me?.id })
+          .insert({ ...base, depot_id: ownerId })
           .select("id")
           .single();
         if (error) throw error;
@@ -341,7 +342,7 @@ function NewPartyDialog({
       if (level === "csa") {
         const { data, error } = await supabase
           .from("distributors")
-          .insert({ ...base, csa_id: ownerId, created_by: me?.id })
+          .insert({ ...base, csa_id: ownerId })
           .select("id")
           .single();
         if (error) throw error;
