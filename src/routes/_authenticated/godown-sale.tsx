@@ -52,6 +52,7 @@ function GodownSalePage() {
   const [notes, setNotes] = useState("");
   const [search, setSearch] = useState("");
   const [qty, setQty] = useState<Record<string, string>>({});
+  const [discount, setDiscount] = useState("");
 
   const { data } = useQuery({
     queryKey: ["godown-sale-master", level, ownerId],
@@ -134,7 +135,8 @@ function GodownSalePage() {
     .map((p) => ({ p, q: Number(qty[p.id] ?? 0) || 0 }))
     .filter((l) => l.q > 0)
     .map((l) => ({ productId: l.p.id, name: l.p.name, qty: l.q, rate: l.p.rate, amount: l.q * l.p.rate }));
-  const total = lines.reduce((s, l) => s + l.amount, 0);
+  const grossTotal = lines.reduce((s, l) => s + l.amount, 0);
+  const total = Math.max(0, grossTotal - (Number(discount) || 0));
   const shortages = lines.filter((l) => l.qty > availableOf(l.productId));
 
   const save = useMutation({
@@ -158,6 +160,7 @@ function GodownSalePage() {
               ? { csa_id: ownerId, distributor_id: partyId }
               : { distributor_id: ownerId, retailer_id: partyId }),
           total_amount: total,
+          discount_amount: Number(discount) || 0,
           notes: notes.trim() ? `Godown sale — ${notes.trim()}` : "Godown sale (manual)",
         })
         .select("id, order_no")
@@ -230,6 +233,10 @@ function GodownSalePage() {
           <div className="grid gap-1.5">
             <Label>Remark (optional)</Label>
             <Input value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="e.g. counter sale, cash bill" />
+          </div>
+          <div className="grid gap-1.5">
+            <Label>Cash Discount (₹)</Label>
+            <Input inputMode="decimal" placeholder="e.g. 250" value={discount} onChange={(e) => setDiscount(e.target.value)} />
           </div>
         </div>
       </Section>

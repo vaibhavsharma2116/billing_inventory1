@@ -1119,7 +1119,8 @@ export type Database = {
           route: string | null
           status: string
           ta_amount: number
-          total_amount: number | null
+          discount_amount: number
+            total_amount: number | null
           user_id: string
           vendor: string | null
         }
@@ -1136,7 +1137,8 @@ export type Database = {
           route?: string | null
           status?: string
           ta_amount?: number
-          total_amount?: number | null
+          discount_amount?: number
+            total_amount?: number | null
           user_id: string
           vendor?: string | null
         }
@@ -1153,7 +1155,8 @@ export type Database = {
           route?: string | null
           status?: string
           ta_amount?: number
-          total_amount?: number | null
+          discount_amount?: number
+            total_amount?: number | null
           user_id?: string
           vendor?: string | null
         }
@@ -1519,7 +1522,8 @@ export type Database = {
           retailer_id: string | null
           salesman_id: string | null
           status: Database["public"]["Enums"]["order_status"]
-          total_amount: number
+          discount_amount: number
+            total_amount: number
         }
         Insert: {
           created_at?: string
@@ -1533,7 +1537,8 @@ export type Database = {
           retailer_id?: string | null
           salesman_id?: string | null
           status?: Database["public"]["Enums"]["order_status"]
-          total_amount?: number
+          discount_amount?: number
+            total_amount?: number
         }
         Update: {
           created_at?: string
@@ -1547,7 +1552,8 @@ export type Database = {
           retailer_id?: string | null
           salesman_id?: string | null
           status?: Database["public"]["Enums"]["order_status"]
-          total_amount?: number
+          discount_amount?: number
+            total_amount?: number
         }
         Relationships: [
           {

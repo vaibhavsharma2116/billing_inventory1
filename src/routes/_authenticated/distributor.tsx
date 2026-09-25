@@ -68,7 +68,7 @@ function DistributorPage() {
 
       let purchaseInvQ = supabase
         .from("invoices")
-        .select("*, orders!inner(order_no, kind, csa_id, distributor_id, csas(*), order_items(id, qty, free_qty, rate, amount, products(name)))")
+        .select("*, orders!inner(order_no, discount_amount, kind, csa_id, distributor_id, csas(*), order_items(id, qty, free_qty, rate, amount, products(name)))")
         .eq("orders.kind", "primary")
         .order("created_at", { ascending: false });
       if (myDistributorId) purchaseInvQ = purchaseInvQ.eq("orders.distributor_id", myDistributorId);
@@ -93,7 +93,7 @@ function DistributorPage() {
         supabase
           .from("invoices")
           .select(
-            "*, orders(order_no, distributor_id, retailers(*), order_items(id, qty, free_qty, rate, amount, products(name)))",
+            "*, orders(order_no, discount_amount, distributor_id, retailers(*), order_items(id, qty, free_qty, rate, amount, products(name)))",
           )
           .order("created_at", { ascending: false }),
         supabase.from("distributors").select("*"),
@@ -739,6 +739,7 @@ function DistributorPage() {
                                 rate: Number(it.rate),
                                 amount: Number(it.amount),
                               })),
+                              discountAmount: Number((ord as any)?.discount_amount) || undefined,
                               taxable: Number(i.taxable_value),
                               cgst: Number(i.cgst),
                               sgst: Number(i.sgst),
@@ -798,6 +799,7 @@ function DistributorPage() {
                                   rate: Number(it.rate),
                                   amount: Number(it.amount),
                                 })),
+                                discountAmount: Number((o as any)?.discount_amount) || undefined,
                                 taxable,
                                 cgst,
                                 sgst,
@@ -869,6 +871,7 @@ function DistributorPage() {
                                 rate: Number(it.rate),
                                 amount: Number(it.amount),
                               })),
+                              discountAmount: Number((ord as any)?.discount_amount) || undefined,
                               taxable: Number(i.taxable_value),
                               cgst: Number(i.cgst),
                               sgst: Number(i.sgst),

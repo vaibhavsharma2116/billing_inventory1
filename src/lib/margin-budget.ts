@@ -57,7 +57,7 @@ export async function fetchMarginBudget(scope: Scope): Promise<MarginBudget> {
   let ordersQ = supabase
     .from("orders")
     .select(
-      "id, kind, status, created_at, distributor_id, csa_id, total_amount, order_items(qty, free_qty, rate, product_id)",
+      "id, kind, status, created_at, distributor_id, csa_id, total_amount, discount_amount, order_items(qty, free_qty, rate, product_id)",
     )
     .in("kind", ["secondary", "primary"])
     .neq("status", "rejected");
@@ -139,6 +139,8 @@ export async function fetchMarginBudget(scope: Scope): Promise<MarginBudget> {
       row.givenBilling += Math.max(standard - rate, 0) * qty;
       row.givenFree += standard * free;
     }
+
+    row.givenBilling += num((o as any).discount_amount);
   }
 
   for (const c of claims.data ?? []) {

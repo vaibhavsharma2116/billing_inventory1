@@ -29,6 +29,7 @@ function OrderDetailPage() {
   const qc = useQueryClient();
   const [qty, setQty] = useState<Record<string, string>>({});
   const [notes, setNotes] = useState("");
+  const [discount, setDiscount] = useState("");
 
   const { data, isLoading } = useQuery({
     queryKey: ["order-detail", orderId],
@@ -59,9 +60,11 @@ function OrderDetailPage() {
     for (const it of order.order_items ?? []) next[it.id] = String(it.qty);
     setQty(next);
     setNotes(order.notes ?? "");
+    setDiscount(String(order.discount_amount || ""));
   }, [order]);
 
-  const newTotal = items.reduce((s, it) => s + Number(it.rate) * (Number(qty[it.id] ?? it.qty) || 0), 0);
+  const grossTotal = items.reduce((s, it) => s + Number(it.rate) * (Number(qty[it.id] ?? it.qty) || 0), 0);
+  const newTotal = Math.max(0, grossTotal - (Number(discount) || 0));
   const anyShort = items.some((it) => {
     const s = (data?.stock ?? []).find(
       (r) => r.product_id === it.product_id && r.distributor_id === order?.distributor_id,
@@ -85,7 +88,7 @@ function OrderDetailPage() {
       }
       const { error } = await supabase
         .from("orders")
-        .update({ total_amount: newTotal, notes: notes.trim() || null })
+        .update({ total_amount: newTotal, notes: notes.trim() || null, discount_amount: Number(discount) || 0 })
         .eq("id", orderId);
       if (error) throw error;
     },
@@ -242,9 +245,24 @@ function OrderDetailPage() {
                 onChange={(e) => setNotes(e.target.value)}
               />
             </div>
+            <div className="grid gap-1.5">
+              <Label htmlFor="discount">Cash Discount (₹)</Label>
+              <Input
+                id="discount"
+                inputMode="decimal"
+                placeholder="e.g. 250"
+                value={discount}
+                onChange={(e) => setDiscount(e.target.value)}
+              />
+            </div>
             <div className="flex items-center justify-between rounded-lg bg-muted/50 p-3 text-sm">
-              <span>Revised total</span>
-              <span className="font-semibold">{inr(newTotal)}</span>
+              <div className="flex flex-col">
+                <span>Revised total</span>
+                {Number(discount) > 0 ? (
+                  <span className="text-[11px] text-muted-foreground">Gross: {inr(grossTotal)} - {inr(Number(discount) || 0)} CD</span>
+                ) : null}
+              </div>
+              <span className="font-semibold text-lg">{inr(newTotal)}</span>
             </div>
             <div className="flex flex-wrap gap-2">
               <Button disabled={save.isPending || act.isPending} variant="outline" onClick={() => save.mutate()}>

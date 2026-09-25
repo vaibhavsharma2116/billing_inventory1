@@ -62,7 +62,7 @@ function DepotPage() {
         supabase.from("depots").select("*").order("name"),
         supabase
           .from("invoices")
-          .select("*, orders(order_no, kind, depot_id, csas(*), order_items(id, qty, free_qty, rate, amount, products(name)))")
+          .select("*, orders(order_no, discount_amount, kind, depot_id, csas(*), order_items(id, qty, free_qty, rate, amount, products(name)))")
           .order("created_at", { ascending: false }),
         supabase.from("expenses").select("*").order("expense_date", { ascending: false }).limit(200),
       ]);
@@ -484,6 +484,7 @@ function DepotPage() {
                                 rate: Number(it.rate),
                                 amount: Number(it.amount),
                               })),
+                              discountAmount: Number((ord as any)?.discount_amount) || undefined,
                               taxable: Number(i.taxable_value),
                               cgst: Number(i.cgst),
                               sgst: Number(i.sgst),

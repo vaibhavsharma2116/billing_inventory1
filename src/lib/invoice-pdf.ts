@@ -27,6 +27,7 @@ export type InvoicePdfData = {
   seller: InvoiceParty;
   buyer: InvoiceParty;
   orderNo?: string | null;
+  discountAmount?: number | undefined;
   lines: InvoicePdfLine[];
   taxable: number;
   cgst: number;
@@ -118,12 +119,17 @@ export async function downloadInvoicePdf(data: InvoicePdfData) {
 
   y += 12;
   doc.line(40, y, W - 40, y);
-  const rows: Array<[string, number, boolean]> = [
+  const rows: Array<[string, number, boolean]> = [];
+  if (data.discountAmount) {
+    rows.push(["Gross Value", data.taxable + data.discountAmount, false]);
+    rows.push(["Cash Discount", -data.discountAmount, false]);
+  }
+  rows.push(
     ["Taxable Value", data.taxable, false],
     ["CGST (9%)", data.cgst, false],
     ["SGST (9%)", data.sgst, false],
-    ["Net Payable", data.net, true],
-  ];
+    ["Net Payable", data.net, true]
+  );
   for (const [label, value, bold] of rows) {
     y += 16;
     doc.setFont("helvetica", bold ? "bold" : "normal");
