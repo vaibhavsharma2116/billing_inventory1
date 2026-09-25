@@ -313,6 +313,7 @@ function NewPartyDialog({
     address: "",
     city: "",
     state: "",
+    margin_pct: "",
   });
   const set = (k: keyof typeof form) => (e: React.ChangeEvent<HTMLInputElement>) =>
     setForm((f) => ({ ...f, [k]: e.target.value }));
@@ -349,14 +350,14 @@ function NewPartyDialog({
       const newId = crypto.randomUUID();
       const { error } = await supabase
         .from("retailers")
-        .insert({ id: newId, ...base, distributor_id: ownerId, retailer_type: "no_ba", created_by: userId });
+        .insert({ id: newId, ...base, margin_pct: Number(form.margin_pct) || 0, distributor_id: ownerId, retailer_type: "no_ba", created_by: userId });
       if (error) throw error;
       return newId;
     },
     onSuccess: async (id) => {
       toast.success("Party created");
       setOpen(false);
-      setForm({ name: "", phone: "", gstin: "", email: "", address: "", city: "", state: "" });
+      setForm({ name: "", phone: "", gstin: "", email: "", address: "", city: "", state: "", margin_pct: "" });
       await onCreated(id);
     },
     onError: (e: Error) => toast.error(e.message),
@@ -404,6 +405,12 @@ function NewPartyDialog({
               <Input value={form.state} onChange={set("state")} />
             </div>
           </div>
+          {level === "distributor" ? (
+            <div className="grid gap-1.5">
+              <Label>Retail Margin % (optional)</Label>
+              <Input inputMode="decimal" placeholder="e.g. 20" value={form.margin_pct} onChange={set("margin_pct")} />
+            </div>
+          ) : null}
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={() => setOpen(false)}>
