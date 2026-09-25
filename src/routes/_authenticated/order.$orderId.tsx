@@ -30,6 +30,7 @@ function OrderDetailPage() {
   const [qty, setQty] = useState<Record<string, string>>({});
   const [notes, setNotes] = useState("");
   const [discount, setDiscount] = useState("");
+  const [discountType, setDiscountType] = useState<"amount" | "percentage">("amount");
 
   const { data, isLoading } = useQuery({
     queryKey: ["order-detail", orderId],
@@ -61,10 +62,13 @@ function OrderDetailPage() {
     setQty(next);
     setNotes(order.notes ?? "");
     setDiscount(String(order.discount_amount || ""));
+    setDiscountType("amount");
   }, [order]);
 
   const grossTotal = items.reduce((s, it) => s + Number(it.rate) * (Number(qty[it.id] ?? it.qty) || 0), 0);
-  const newTotal = Math.max(0, grossTotal - (Number(discount) || 0));
+  const discountVal = Number(discount) || 0;
+  const actualDiscount = discountType === "percentage" ? (grossTotal * discountVal) / 100 : discountVal;
+  const newTotal = Math.max(0, grossTotal - actualDiscount);
   const anyShort = items.some((it) => {
     const s = (data?.stock ?? []).find(
       (r) => r.product_id === it.product_id && r.distributor_id === order?.distributor_id,
@@ -88,7 +92,7 @@ function OrderDetailPage() {
       }
       const { error } = await supabase
         .from("orders")
-        .update({ total_amount: newTotal, notes: notes.trim() || null, discount_amount: Number(discount) || 0 })
+        .update({ total_amount: newTotal, notes: notes.trim() || null, discount_amount: actualDiscount })
         .eq("id", orderId);
       if (error) throw error;
     },
@@ -246,11 +250,17 @@ function OrderDetailPage() {
               />
             </div>
             <div className="grid gap-1.5">
-              <Label htmlFor="discount">Cash Discount (₹)</Label>
+              <div className="flex items-center justify-between">
+                <Label htmlFor="discount">Cash Discount</Label>
+                <div className="flex bg-muted/60 rounded overflow-hidden border border-border/40">
+                  <button type="button" className={`px-2.5 py-0.5 text-[11px] font-medium transition-colors ${discountType === 'amount' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground'}`} onClick={() => setDiscountType("amount")}>₹</button>
+                  <button type="button" className={`px-2.5 py-0.5 text-[11px] font-medium transition-colors ${discountType === 'percentage' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground'}`} onClick={() => setDiscountType("percentage")}>%</button>
+                </div>
+              </div>
               <Input
                 id="discount"
                 inputMode="decimal"
-                placeholder="e.g. 250"
+                placeholder={discountType === "percentage" ? "e.g. 5" : "e.g. 250"}
                 value={discount}
                 onChange={(e) => setDiscount(e.target.value)}
               />
@@ -258,8 +268,8 @@ function OrderDetailPage() {
             <div className="flex items-center justify-between rounded-lg bg-muted/50 p-3 text-sm">
               <div className="flex flex-col">
                 <span>Revised total</span>
-                {Number(discount) > 0 ? (
-                  <span className="text-[11px] text-muted-foreground">Gross: {inr(grossTotal)} - {inr(Number(discount) || 0)} CD</span>
+                {actualDiscount > 0 ? (
+                  <span className="text-[11px] text-muted-foreground">Gross: {inr(grossTotal)} - {inr(actualDiscount)} CD</span>
                 ) : null}
               </div>
               <span className="font-semibold text-lg">{inr(newTotal)}</span>

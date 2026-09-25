@@ -53,6 +53,7 @@ function GodownSalePage() {
   const [search, setSearch] = useState("");
   const [qty, setQty] = useState<Record<string, string>>({});
   const [discount, setDiscount] = useState("");
+  const [discountType, setDiscountType] = useState<"amount" | "percentage">("amount");
 
   const { data } = useQuery({
     queryKey: ["godown-sale-master", level, ownerId],
@@ -136,7 +137,9 @@ function GodownSalePage() {
     .filter((l) => l.q > 0)
     .map((l) => ({ productId: l.p.id, name: l.p.name, qty: l.q, rate: l.p.rate, amount: l.q * l.p.rate }));
   const grossTotal = lines.reduce((s, l) => s + l.amount, 0);
-  const total = Math.max(0, grossTotal - (Number(discount) || 0));
+  const discountVal = Number(discount) || 0;
+  const actualDiscount = discountType === "percentage" ? (grossTotal * discountVal) / 100 : discountVal;
+  const total = Math.max(0, grossTotal - actualDiscount);
   const shortages = lines.filter((l) => l.qty > availableOf(l.productId));
 
   const save = useMutation({
@@ -160,7 +163,7 @@ function GodownSalePage() {
               ? { csa_id: ownerId, distributor_id: partyId }
               : { distributor_id: ownerId, retailer_id: partyId }),
           total_amount: total,
-          discount_amount: Number(discount) || 0,
+          discount_amount: actualDiscount,
           notes: notes.trim() ? `Godown sale — ${notes.trim()}` : "Godown sale (manual)",
         })
         .select("id, order_no")
@@ -235,8 +238,14 @@ function GodownSalePage() {
             <Input value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="e.g. counter sale, cash bill" />
           </div>
           <div className="grid gap-1.5">
-            <Label>Cash Discount (₹)</Label>
-            <Input inputMode="decimal" placeholder="e.g. 250" value={discount} onChange={(e) => setDiscount(e.target.value)} />
+            <div className="flex items-center justify-between">
+              <Label>Cash Discount</Label>
+              <div className="flex bg-muted/60 rounded overflow-hidden border border-border/40">
+                <button type="button" className={`px-2.5 py-0.5 text-[11px] font-medium transition-colors ${discountType === 'amount' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground'}`} onClick={() => setDiscountType("amount")}>₹</button>
+                <button type="button" className={`px-2.5 py-0.5 text-[11px] font-medium transition-colors ${discountType === 'percentage' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground'}`} onClick={() => setDiscountType("percentage")}>%</button>
+              </div>
+            </div>
+            <Input inputMode="decimal" placeholder={discountType === "percentage" ? "e.g. 5" : "e.g. 250"} value={discount} onChange={(e) => setDiscount(e.target.value)} />
           </div>
         </div>
       </Section>
@@ -280,6 +289,12 @@ function GodownSalePage() {
       </div>
 
       <div className="sticky bottom-3 mt-4 rounded-xl border border-border/60 bg-card p-3 shadow-lg">
+        {actualDiscount > 0 ? (
+          <div className="mb-2 flex justify-between text-[11px] text-muted-foreground border-b border-border/40 pb-1.5">
+            <span>Gross: {inr(grossTotal)}</span>
+            <span>- {inr(actualDiscount)} CD</span>
+          </div>
+        ) : null}
         <div className="flex items-center justify-between text-sm">
           <span>
             {lines.length} SKU • Net with GST {inr(gstBreakup(total).net)}
