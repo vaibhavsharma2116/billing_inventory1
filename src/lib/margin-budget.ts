@@ -66,14 +66,14 @@ export async function fetchMarginBudget(scope: Scope): Promise<MarginBudget> {
 
   const [orders, products, claims, distributors, csas] = await Promise.all([
     ordersQ,
-    supabase.from("products").select("id, ptr, pts, csa_rate"),
+    supabase.from("products").select("id, mrp, ptr, pts, csa_rate"),
     supabase.from("claims").select("id, distributor_id, status, approved_amount, claim_amount, created_at"),
     supabase.from("distributors").select("id, name, city, state, csa_id"),
     supabase.from("csas").select("id, name, city, state"),
   ]);
 
   const priceOf = new Map(
-    (products.data ?? []).map((p) => [p.id, { ptr: num(p.ptr), pts: num(p.pts), csa: num(p.csa_rate) }]),
+    (products.data ?? []).map((p) => [p.id, { mrp: num(p.mrp), ptr: num(p.ptr), pts: num(p.pts), csa: num(p.csa_rate) }]),
   );
 
   const rows = new Map<string, PartyMargin>();
@@ -134,8 +134,11 @@ export async function fetchMarginBudget(scope: Scope): Promise<MarginBudget> {
       const free = num(it.free_qty);
       const rate = num(it.rate);
 
+      // Reserve 10% of MRP for the distributor's own profit
+      const reservedMargin = isSecondary ? (p.mrp * 10) / 100 : 0;
+
       row.sales += qty * rate;
-      row.allowed += Math.max(standard - cost, 0) * qty;
+      row.allowed += Math.max(standard - cost - reservedMargin, 0) * qty;
       row.givenBilling += Math.max(standard - rate, 0) * qty;
       row.givenFree += standard * free;
     }

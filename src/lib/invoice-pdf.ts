@@ -57,10 +57,13 @@ export async function downloadInvoicePdf(data: InvoicePdfData) {
   const logo = await getLogoDataUrl();
   if (logo) {
     doc.addImage(logo, "PNG", 40, y - 26, 108, 36, undefined, "FAST");
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(14);
+    doc.text("POPPiK Lifestyle Private Limited", 160, y - 5);
   } else {
     doc.setFont("helvetica", "bold");
-    doc.setFontSize(18);
-    doc.text("POPPiK", 40, y);
+    doc.setFontSize(16);
+    doc.text("POPPiK Lifestyle Private Limited", 40, y);
   }
   doc.setFontSize(11);
   doc.setFont("helvetica", "normal");
