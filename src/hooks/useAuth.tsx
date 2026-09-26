@@ -56,7 +56,10 @@ export function writeActiveRole(userId: string, role: string) {
 export function useMe() {
   const { session, loading } = useSession();
   const userId = session?.user.id;
-  const [activeRole, setActive] = useState<string | null>(null);
+  const [activeRole, setActive] = useState<string | null>(() => {
+    if (typeof window === "undefined" || !userId) return null;
+    return readActiveRole(userId);
+  });
 
   useEffect(() => {
     setActive(readActiveRole(userId));
