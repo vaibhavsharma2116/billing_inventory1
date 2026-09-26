@@ -12,7 +12,7 @@ import { BarChart3, BookUser, Download, IndianRupee, PackagePlus, Store } from "
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { compactInr, gstBreakup, inr } from "@/lib/sfa";
+import { compactInr, gstBreakup, inr, exactInr } from "@/lib/sfa";
 import { downloadInvoicePdf } from "@/lib/invoice-pdf";
 import { downloadReportPdf, rs } from "@/lib/report-pdf";
 import { toParty } from "@/lib/invoice-party";
@@ -549,7 +549,7 @@ function DistributorPage() {
                       {(o.order_items ?? []).map((it) => (
                         <p key={it.id} className="text-[11px] text-muted-foreground">
                           {(it.products as { name: string } | null)?.name} — {it.qty} pcs
-                          {it.free_qty ? ` (+${it.free_qty} free)` : ""} @ {inr(it.rate)}
+                          {it.free_qty ? ` (+${it.free_qty} free)` : ""} @ {exactInr(it.rate)}
                         </p>
                       ))}
                     </div>
@@ -816,7 +816,7 @@ function DistributorPage() {
                     <div className="mt-2 space-y-0.5">
                       {(o.order_items ?? []).map((it) => (
                         <p key={it.id} className="text-[11px] text-muted-foreground">
-                          {(it.products as { name: string } | null)?.name} — {it.qty} pcs @ {inr(it.rate)}
+                          {(it.products as { name: string } | null)?.name} — {it.qty} pcs @ {exactInr(it.rate)}
                         </p>
                       ))}
                     </div>

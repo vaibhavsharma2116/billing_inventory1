@@ -26,7 +26,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { applyQtyScheme, inr, valueScheme, type SchemeRow } from "@/lib/sfa";
+import { applyQtyScheme, inr, exactInr, valueScheme, type SchemeRow } from "@/lib/sfa";
 
 type DetailKind = "outstanding" | "order_value";
 
@@ -372,7 +372,7 @@ function OrderBooking() {
                 <div className="min-w-0">
                   <p className="truncate text-sm font-medium">{p.name}</p>
                   <p className="text-[11px] text-muted-foreground">
-                    {p.sku} • Rate {inr(rateFor(Number(p.ptr)))} • MRP {inr(p.mrp)}
+                    {p.sku} • Rate {exactInr(rateFor(Number(p.ptr)))} • MRP {inr(p.mrp)}
                   </p>
                   <p className="mt-1 text-[11px]">
                     <span className={available === 0 ? "text-destructive" : available <= 10 ? "text-warning" : "text-success"}>
@@ -494,7 +494,7 @@ function OrderBooking() {
                       <div className="min-w-0">
                         <p className="truncate text-xs font-medium">{l.product.name}</p>
                         <p className="text-[11px] text-muted-foreground">
-                          {l.qty} × {inr(l.rate)}{l.freeQty > 0 ? ` + ${l.freeQty} free` : ""}
+                          {l.qty} × {exactInr(l.rate)}{l.freeQty > 0 ? ` + ${l.freeQty} free` : ""}
                         </p>
                       </div>
                       <span className="shrink-0 text-xs font-semibold tabular-nums">{inr(l.amount)}</span>

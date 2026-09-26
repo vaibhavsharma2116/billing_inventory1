@@ -15,7 +15,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { inr } from "@/lib/sfa";
+import { inr, exactInr } from "@/lib/sfa";
 import { downloadReportPdf } from "@/lib/report-pdf";
 import { getPosition, useLocationTracking } from "@/hooks/useLocationTracking";
 
@@ -404,7 +404,7 @@ function BaPage() {
                     <div className="min-w-0">
                       <p className="truncate font-medium">{(s.products as { name: string } | null)?.name}</p>
                       <p className="text-[11px] text-muted-foreground">
-                        {s.qty} pcs × {inr(s.rate)}
+                        {s.qty} pcs × {exactInr(s.rate)}
                         {s.notes ? ` • ${s.notes}` : ""}
                       </p>
                     </div>

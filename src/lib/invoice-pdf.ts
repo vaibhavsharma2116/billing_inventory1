@@ -1,4 +1,4 @@
-import { inr } from "@/lib/sfa";
+import { inr, exactInr } from "@/lib/sfa";
 import { getLogoDataUrl } from "@/lib/brand-logo";
 
 export type InvoicePdfLine = {
@@ -116,7 +116,7 @@ export async function downloadInvoicePdf(data: InvoicePdfData) {
     const label = l.freeQty ? `${l.name} (+${l.freeQty} free)` : l.name;
     doc.text(label.slice(0, 48), 40, y);
     doc.text(String(l.qty), 320, y, { align: "right" });
-    doc.text(money(l.rate), 400, y, { align: "right" });
+    doc.text(exactInr(l.rate).replace("₹", "Rs. "), 400, y, { align: "right" });
     doc.text(money(l.amount), W - 40, y, { align: "right" });
   }
 

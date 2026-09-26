@@ -17,7 +17,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { Plus } from "lucide-react";
-import { gstBreakup, inr } from "@/lib/sfa";
+import { gstBreakup, inr, exactInr } from "@/lib/sfa";
 import { useMe } from "@/hooks/useAuth";
 
 export const Route = createFileRoute("/_authenticated/godown-sale")({
@@ -267,7 +267,7 @@ function GodownSalePage() {
                     <div className="min-w-0">
                       <p className="truncate text-sm font-medium">{p.name}</p>
                       <p className="text-[11px] text-muted-foreground">
-                        {p.sku} • {inr(p.rate)} • Available {available}
+                        {p.sku} • {exactInr(p.rate)} • Available {available}
                       </p>
                       {q > available ? (
                         <p className="text-[11px] font-medium text-warning">Stock short — only {available} available</p>

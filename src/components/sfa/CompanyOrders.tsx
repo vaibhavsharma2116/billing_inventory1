@@ -7,7 +7,7 @@ import { Section } from "@/components/sfa/Shell";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { inr } from "@/lib/sfa";
+import { inr, exactInr } from "@/lib/sfa";
 
 type Item = { id: string; product_id: string; qty: number; rate: number; amount: number; products: { name: string; sku: string } | null };
 type Order = {
@@ -143,7 +143,7 @@ export function CompanyOrders() {
                     <div key={it.id} className="flex items-center justify-between gap-2 text-sm">
                       <span className="min-w-0 flex-1 truncate">
                         {it.products?.name ?? "Product"}{" "}
-                        <span className="text-[11px] text-muted-foreground">@ {inr(it.rate)}</span>
+                        <span className="text-[11px] text-muted-foreground">@ {exactInr(it.rate)}</span>
                       </span>
                       <Input
                         type="number"

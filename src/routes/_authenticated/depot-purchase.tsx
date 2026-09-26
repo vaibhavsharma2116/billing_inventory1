@@ -10,7 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { inr } from "@/lib/sfa";
+import { inr, exactInr } from "@/lib/sfa";
 
 export const Route = createFileRoute("/_authenticated/depot-purchase")({
   head: () => ({
@@ -204,7 +204,7 @@ function DepotPurchasePage() {
                 <div className="min-w-0 flex-1">
                   <p className="truncate font-medium">{l.name}</p>
                   <p className="text-[11px] text-muted-foreground">
-                    {l.sku} • PTS {inr(l.rate)} •{" "}
+                    {l.sku} • PTS {exactInr(l.rate)} •{" "}
                     <span className={l.available <= 10 ? "font-semibold text-warning" : "font-semibold text-success"}>
                       Available {l.available}
                     </span>

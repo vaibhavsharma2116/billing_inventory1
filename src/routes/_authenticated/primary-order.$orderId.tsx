@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { gstBreakup, inr } from "@/lib/sfa";
+import { gstBreakup, inr, exactInr } from "@/lib/sfa";
 
 export const Route = createFileRoute("/_authenticated/primary-order/$orderId")({
   head: () => ({
@@ -225,7 +225,7 @@ function PrimaryOrderPage() {
                   <div className="min-w-0">
                     <p className="truncate text-sm font-medium">{(it.products as { name: string } | null)?.name}</p>
                     <p className="text-[11px] text-muted-foreground">
-                      Asked {it.qty} pcs • Rate {inr(it.rate)} •{" "}
+                      Asked {it.qty} pcs • Rate {exactInr(it.rate)} •{" "}
                       <span className={short ? "text-warning" : "text-success"}>Stock {available}</span>
                     </p>
                   </div>

@@ -6,7 +6,7 @@ import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { inr } from "@/lib/sfa";
+import { inr, exactInr } from "@/lib/sfa";
 
 export type EditableOrder = {
   id: string;
@@ -96,7 +96,7 @@ export function EditOrderDialog({
                   <div className="min-w-0">
                     <p className="truncate text-sm font-medium">{it.products?.name}</p>
                     <p className="text-[11px] text-muted-foreground">
-                      Rate {inr(it.rate)} • Available {available}
+                      Rate {exactInr(it.rate)} • Available {available}
                       {it.free_qty ? ` • ${it.free_qty} free` : ""}
                     </p>
                   </div>

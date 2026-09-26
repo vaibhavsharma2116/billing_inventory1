@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { gstBreakup, inr } from "@/lib/sfa";
+import { gstBreakup, inr, exactInr } from "@/lib/sfa";
 
 export const Route = createFileRoute("/_authenticated/order/$orderId")({
   head: () => ({
@@ -211,7 +211,7 @@ function OrderDetailPage() {
                   <div className="min-w-0">
                     <p className="truncate text-sm font-medium">{(it.products as { name: string } | null)?.name}</p>
                     <p className="text-[11px] text-muted-foreground">
-                      Rate {inr(it.rate)} • Available {available}
+                      Rate {exactInr(it.rate)} • Available {available}
                       {it.free_qty ? ` • ${it.free_qty} free` : ""}
                     </p>
                   </div>

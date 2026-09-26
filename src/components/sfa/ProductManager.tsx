@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Section } from "@/components/sfa/Shell";
-import { inr } from "@/lib/sfa";
+import { inr, exactInr } from "@/lib/sfa";
 import {
   Dialog,
   DialogContent,
@@ -231,7 +231,7 @@ export function ProductManager() {
               <div className="shrink-0 text-right text-[11px] text-muted-foreground">
                 <p className="text-sm font-semibold tabular-nums text-foreground">MRP {inr(p.mrp)}</p>
                 <p className="tabular-nums">
-                  Retail {inr(p.ptr)} • Dist {inr(p.pts)} • CSA {inr(p.csa_rate)}
+                  Retail {exactInr(p.ptr)} • Dist {exactInr(p.pts)} • CSA {exactInr(p.csa_rate)}
                 </p>
               </div>
             </button>

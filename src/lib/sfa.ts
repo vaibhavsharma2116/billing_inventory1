@@ -1,6 +1,11 @@
 export const inr = (n: number | null | undefined) =>
   "₹" + Math.round(Number(n ?? 0)).toLocaleString("en-IN");
 
+export const exactInr = (n: number | null | undefined) => {
+  const num = Number(n ?? 0);
+  return "₹" + (Number.isInteger(num) ? num.toLocaleString("en-IN") : num.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
+};
+
 export const compactInr = (n: number | null | undefined) => {
   const v = Number(n ?? 0);
   if (v >= 10000000) return "₹" + (v / 10000000).toFixed(2) + " Cr";

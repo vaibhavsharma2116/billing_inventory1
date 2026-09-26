@@ -76,7 +76,7 @@ export function AutoPayroll() {
         supabase.from("profiles").select("id, full_name, employee_code").order("full_name"),
         supabase.from("user_roles").select("user_id, role"),
         supabase.from("attendance").select("user_id, work_date, punch_in").gte("work_date", from).lte("work_date", to),
-        supabase.from("leaves").select("user_id, from_date, to_date, status").eq("status", "approved"),
+        supabase.from("leaves").select("user_id, from_date, to_date, status, leave_type").eq("status", "approved"),
         supabase
           .from("expenses")
           .select("user_id, total_amount, status, expense_date")
@@ -158,7 +158,11 @@ export function AutoPayroll() {
           }
         } else {
           if (l) {
-            fullLeaveCount += 1;
+            if (isHalf) {
+              halfLeaveCount += 0.5;
+            } else {
+              fullLeaveCount += 1;
+            }
           }
         }
       }
