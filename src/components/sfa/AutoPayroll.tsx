@@ -64,6 +64,7 @@ export function AutoPayroll() {
   const [payLeaves, setPayLeaves] = useState(true);
   const [addReimbursement, setAddReimbursement] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
+  const [tillToday, setTillToday] = useState(false);
 
   const days = useMemo(() => monthDays(month), [month]);
   const from = days[0]!;
@@ -102,9 +103,15 @@ export function AutoPayroll() {
     },
   });
 
+  // Ensure timezone offset is accounted for to get local YYYY-MM-DD
+  const todayDate = new Date(new Date().getTime() - new Date().getTimezoneOffset() * 60000).toISOString().split("T")[0]!;
+  const processedDays = useMemo(() => {
+    return tillToday ? days.filter((d) => d <= todayDate) : days;
+  }, [days, tillToday]);
+
   // Salary month based on actual days; every Sunday is a paid weekly off.
   const workingDays = days.length;
-  const sundayCount = useMemo(() => days.filter(isSunday).length, [days]);
+  const sundayCount = useMemo(() => processedDays.filter(isSunday).length, [processedDays]);
 
   const lines: PayrollLine[] = useMemo(() => {
     if (!data) return [];
@@ -130,7 +137,7 @@ export function AutoPayroll() {
         .pop() ?? (salaryEffFrom && salaryEffFrom >= from ? salaryEffFrom : null);
       
       // Mid-month joiners / exiters
-      const eligibleDays = days.filter((d) => (!effectiveFrom || d >= effectiveFrom) && (!exitDate || d <= exitDate));
+      const eligibleDays = processedDays.filter((d) => (!effectiveFrom || d >= effectiveFrom) && (!exitDate || d <= exitDate));
       
       if (eligibleDays.length === 0) continue; // safety check
       
@@ -185,7 +192,9 @@ export function AutoPayroll() {
       const lopAmount = Math.round(perDay * paidBase - earnedGross);
       const deductions = Math.round((num(s?.["deductions"]) * paidBase) / workingDays);
       const reimbursement = addReimbursement
-        ? data.expenses.filter((e) => e.user_id === p.id).reduce((t, e) => t + Number(e.total_amount ?? 0), 0)
+        ? data.expenses
+            .filter((e) => e.user_id === p.id && (!tillToday || String(e.expense_date) <= todayDate))
+            .reduce((t, e) => t + Number(e.total_amount ?? 0), 0)
         : 0;
       const net = Math.max(earnedGross - deductions, 0) + reimbursement;
       
@@ -210,7 +219,7 @@ export function AutoPayroll() {
       });
     }
     return out;
-  }, [data, days, from, to, workingDays, payLeaves, addReimbursement]);
+  }, [data, days, processedDays, from, to, workingDays, payLeaves, addReimbursement, tillToday, todayDate]);
 
   const payable = lines.filter((l) => l.hasStructure);
   const totalNet = payable.reduce((s, l) => s + l.net, 0);
@@ -337,6 +346,10 @@ export function AutoPayroll() {
         <label className="flex items-center gap-2 text-sm">
           <Switch checked={addReimbursement} onCheckedChange={setAddReimbursement} />
           Add approved expenses
+        </label>
+        <label className="flex items-center gap-2 text-sm font-semibold text-primary">
+          <Switch checked={tillToday} onCheckedChange={setTillToday} />
+          Calculate till today
         </label>
       </div>
 
