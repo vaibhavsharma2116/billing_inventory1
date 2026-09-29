@@ -70,20 +70,24 @@ export function SalesmanStockReport() {
       )
     : stock;
 
+  const grouped = filtered.reduce((acc, row) => {
+    if (!acc[row.location]) acc[row.location] = [];
+    acc[row.location].push(row);
+    return acc;
+  }, {} as Record<string, typeof filtered>);
+
   const downloadPdf = () => {
     downloadReportPdf({
       fileName: `stock-statement.pdf`,
       title: "Mapped Stock Statement",
       subtitle: new Date().toLocaleDateString("en-IN"),
       meta: [`Total items: ${filtered.length}`, `Distributors mapped: ${distIds.length}`, `CSAs mapped: ${csaIds.length}`],
-      tables: [
-        {
-          title: "Current Physical Stock",
-          head: ["Product / SKU", "Location", "Qty"],
-          align: ["left", "left", "right"],
-          rows: filtered.map((r) => [`${r.product}\n${r.sku}`, r.location, String(r.qty)]),
-        },
-      ],
+      tables: Object.entries(grouped).map(([loc, items]) => ({
+        title: `Stock at ${loc}`,
+        head: ["Product / SKU", "Qty"],
+        align: ["left", "right"],
+        rows: items.map((r) => [`${r.product}\n${r.sku}`, String(r.qty)]),
+      })),
     });
   };
 
@@ -110,23 +114,30 @@ export function SalesmanStockReport() {
           </Button>
         }
       >
-        <div className="divide-y divide-border/60">
+        <div className="flex flex-col">
           {isLoading ? (
             <p className="p-4 text-sm text-muted-foreground">Loading stock…</p>
           ) : filtered.length === 0 ? (
             <p className="p-4 text-sm text-muted-foreground">No stock available or found.</p>
           ) : (
-            filtered.map((r, i) => (
-              <div key={i} className="flex items-center justify-between gap-3 p-3 text-sm">
-                <div className="min-w-0">
-                  <p className="truncate font-medium">{r.product}</p>
-                  <p className="text-[11px] text-muted-foreground">
-                    {r.sku} • {r.location}
-                  </p>
+            Object.entries(grouped).map(([loc, items]) => (
+              <div key={loc} className="mb-2">
+                <div className="bg-muted/50 px-3 py-1.5 text-xs font-semibold text-muted-foreground">
+                  {loc}
                 </div>
-                <div className="shrink-0 text-right">
-                  <span className="font-semibold">{r.qty}</span>
-                  <span className="ml-1 text-[11px] text-muted-foreground">pcs</span>
+                <div className="divide-y divide-border/60">
+                  {items.map((r, i) => (
+                    <div key={i} className="flex items-center justify-between gap-3 p-3 text-sm">
+                      <div className="min-w-0">
+                        <p className="truncate font-medium">{r.product}</p>
+                        <p className="text-[11px] text-muted-foreground">{r.sku}</p>
+                      </div>
+                      <div className="shrink-0 text-right">
+                        <span className="font-semibold tabular-nums">{r.qty}</span>
+                        <span className="ml-1 text-[11px] text-muted-foreground">pcs</span>
+                      </div>
+                    </div>
+                  ))}
                 </div>
               </div>
             ))
