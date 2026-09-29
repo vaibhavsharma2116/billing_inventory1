@@ -26,7 +26,7 @@ export const Route = createFileRoute("/_authenticated/party-ledger/$type/$id")({
 
 function PartyLedgerDetailPage() {
   const { type, id } = Route.useParams();
-  const partyType: PartyType = type === "distributor" ? "distributor" : "retailer";
+  const partyType: PartyType = type === "distributor" ? "distributor" : type === "csa" ? "csa" : "retailer";
   const { data: me } = useMe();
   const isCsa = me?.role === "csa";
   const isDepot = me?.role === "depot";
