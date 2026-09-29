@@ -149,6 +149,20 @@ function OrderBooking() {
     },
   });
 
+  const { data: baOrders } = useQuery({
+    queryKey: ["ba-order-history", me?.profile?.id],
+    enabled: isBa && !!me?.profile?.id,
+    queryFn: async () => {
+      const { data } = await supabase
+        .from("orders")
+        .select("id, order_no, status, total_amount, created_at, distributors(name)")
+        .eq("salesman_id", me!.profile!.id)
+        .order("created_at", { ascending: false })
+        .limit(10);
+      return data ?? [];
+    },
+  });
+
   const availableOf = (productId: string) => {
     const s = stock?.find((x) => x.product_id === productId);
     return s ? s.physical_qty - s.reserved_qty : 0;
@@ -437,6 +451,35 @@ function OrderBooking() {
           </Button>
         </div>
       </Section>
+
+      {isBa ? (
+        <Section title="Order History">
+          <div className="divide-y divide-border/60">
+            {baOrders?.length === 0 ? (
+              <div className="p-4 text-center text-sm text-muted-foreground">No recent orders.</div>
+            ) : (
+              baOrders?.map((o) => (
+                <div key={o.id} className="flex items-center justify-between gap-3 p-3 text-sm">
+                  <div className="min-w-0">
+                    <p className="truncate font-medium">{o.order_no}</p>
+                    <p className="text-[11px] text-muted-foreground">
+                      {new Date(o.created_at).toLocaleDateString("en-IN", { day: 'numeric', month: 'short', year: 'numeric' })}
+                      {o.distributors?.name ? ` • ${o.distributors.name}` : ""}
+                    </p>
+                  </div>
+                  <div className="text-right">
+                    <p className="font-semibold">{inr(o.total_amount)}</p>
+                    <Badge variant="outline" className={`mt-1 text-[10px] capitalize ${o.status === "delivered" ? "text-success border-success/30" : o.status === "cancelled" ? "text-destructive border-destructive/30" : "text-amber-600 border-amber-600/30"}`}>
+                      {o.status}
+                    </Badge>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+        </Section>
+      ) : null}
+
       <Dialog open={detail !== null} onOpenChange={(open) => !open && setDetail(null)}>
         <DialogContent className="max-h-[80vh] max-w-md overflow-y-auto">
           <DialogHeader>
