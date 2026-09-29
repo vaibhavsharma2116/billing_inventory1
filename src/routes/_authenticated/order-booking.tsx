@@ -86,7 +86,8 @@ function OrderBooking() {
 
   const isBa = me?.role === "ba";
   const myOutletId = (me?.profile as { retailer_id?: string | null } | undefined)?.retailer_id ?? null;
-  const { data: mappedDistributors = [] } = useMappedDistributors(!isBa);
+  const myDistributorId = (me?.profile as { distributor_id?: string | null } | undefined)?.distributor_id ?? null;
+  const { data: mappedDistributors = [] } = useMappedDistributors(true);
   const mappedIds = new Set(mappedDistributors.map((d) => d.id));
   const visibleRetailers = (data?.retailers ?? []).filter((r) => {
     if (isBa) return r.id === myOutletId;
@@ -100,7 +101,7 @@ function OrderBooking() {
   }, [isBa, myOutletId, retailerId]);
 
   const retailer = data?.retailers.find((r) => r.id === retailerId);
-  const distributorId = retailer?.distributor_id ?? null;
+  const distributorId = isBa ? myDistributorId : (retailer?.distributor_id ?? null);
   // Field executives / managers can preview live stock of the distributor they
   // picked in the filter, even before choosing a retailer.
   const stockDistributorId = distributorId ?? filterDistributor;
@@ -175,7 +176,9 @@ function OrderBooking() {
 
   const submit = useMutation({
     mutationFn: async () => {
-      if (!retailer || !distributorId) throw new Error("Please select a retailer");
+      if (!isBa && !retailer) throw new Error("Please select a retailer");
+      if (isBa && !myOutletId) throw new Error("No counter (retailer) mapped to your account. Cannot place order.");
+      if (!distributorId) throw new Error("No distributor mapped to place order against");
       if (lines.length === 0) throw new Error("Add at least one product");
       for (const l of lines) {
         if (l.qty + l.freeQty > availableOf(l.product.id))
@@ -185,7 +188,7 @@ function OrderBooking() {
         .from("orders")
         .insert({
           kind: "secondary",
-          retailer_id: retailer.id,
+          retailer_id: isBa ? myOutletId : retailer!.id,
           distributor_id: distributorId,
           salesman_id: me?.profile?.id ?? null,
           total_amount: net,
@@ -221,7 +224,7 @@ function OrderBooking() {
     },
     onSuccess: (order) => {
       toast.success(`Order ${order.order_no} sent to distributor`);
-      navigate({ to: "/salesman" });
+      navigate({ to: isBa ? "/ba" : "/salesman" });
     },
     onError: (e: Error) => toast.error(e.message),
   });
@@ -288,53 +291,60 @@ function OrderBooking() {
         </div>
       )}
 
-      <div className="space-y-1.5">
-        <div className="flex items-center justify-between gap-2">
-          <Label>Retailer</Label>
-          <div className="flex items-center gap-2">
-            {isBa ? null : <AddRetailerDialog invalidateKeys={["booking-master"]} />}
+      {isBa ? (
+        <div className="space-y-1.5">
+          <Label>Distributor</Label>
+          <div className="h-9 w-full rounded-md border border-input bg-muted px-3 py-2 text-sm text-muted-foreground">
+            {mappedDistributors.find((d) => d.id === myDistributorId)?.name ?? "No distributor mapped"}
           </div>
         </div>
-
-        <Select value={retailerId} onValueChange={setRetailerId} disabled={isBa}>
-
-          <SelectTrigger>
-            <SelectValue placeholder="Select retailer / outlet" />
-          </SelectTrigger>
-          <SelectContent>
-            <div className="p-2">
-              <Input
-                autoFocus
-                value={retailerSearch}
-                onChange={(e) => setRetailerSearch(e.target.value)}
-                onKeyDown={(e) => e.stopPropagation()}
-                placeholder="Search retailer…"
-                className="h-9"
-              />
+      ) : (
+        <div className="space-y-1.5">
+          <div className="flex items-center justify-between gap-2">
+            <Label>Retailer</Label>
+            <div className="flex items-center gap-2">
+              <AddRetailerDialog invalidateKeys={["booking-master"]} />
             </div>
-            {visibleRetailers
-              .filter((r) => {
-                const q = retailerSearch.trim().toLowerCase();
-                return (
-                  !q ||
-                  r.name.toLowerCase().includes(q) ||
-                  (r.city ?? "").toLowerCase().includes(q) ||
-                  (r.phone ?? "").toLowerCase().includes(q)
-                );
-              })
-              .map((r) => (
-                <SelectItem key={r.id} value={r.id}>
-                  {r.name} — {r.city}
-                </SelectItem>
-              ))}
-          </SelectContent>
-        </Select>
-      </div>
+          </div>
 
+          <Select value={retailerId} onValueChange={setRetailerId}>
+            <SelectTrigger>
+              <SelectValue placeholder="Select retailer / outlet" />
+            </SelectTrigger>
+            <SelectContent>
+              <div className="p-2">
+                <Input
+                  autoFocus
+                  value={retailerSearch}
+                  onChange={(e) => setRetailerSearch(e.target.value)}
+                  onKeyDown={(e) => e.stopPropagation()}
+                  placeholder="Search retailer…"
+                  className="h-9"
+                />
+              </div>
+              {visibleRetailers
+                .filter((r) => {
+                  const q = retailerSearch.trim().toLowerCase();
+                  return (
+                    !q ||
+                    r.name.toLowerCase().includes(q) ||
+                    (r.city ?? "").toLowerCase().includes(q) ||
+                    (r.phone ?? "").toLowerCase().includes(q)
+                  );
+                })
+                .map((r) => (
+                  <SelectItem key={r.id} value={r.id}>
+                    {r.name} — {r.city}
+                  </SelectItem>
+                ))}
+            </SelectContent>
+          </Select>
+        </div>
+      )}
 
-      {retailer ? (
+      {retailer || isBa ? (
         <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-3 md:grid-cols-4">
-          <StatCard label="Outstanding" value={inr(retailer.outstanding)} tone="danger" hint="Tap for detail" onClick={() => setDetail("outstanding")} />
+          {!isBa && retailer ? <StatCard label="Outstanding" value={inr(retailer.outstanding)} tone="danger" hint="Tap for detail" onClick={() => setDetail("outstanding")} /> : null}
           <StatCard label="Order Value" value={inr(net)} tone="primary" hint="Tap for detail" onClick={() => setDetail("order_value")} />
         </div>
       ) : null}

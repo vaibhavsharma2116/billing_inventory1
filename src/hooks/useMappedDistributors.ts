@@ -17,6 +17,7 @@ export function useMappedDistributors(enabled = true) {
   const ownDistributor = me?.profile?.distributor_id ?? null;
   const managerScoped = roles.some((r) => isManagerRole(r as AppRole));
   const isDistributor = me?.role === "distributor";
+  const isBa = me?.role === "ba";
 
   return useQuery({
     queryKey: ["mapped-distributors", userId, managerScoped, isDistributor, ownDistributor],
@@ -30,6 +31,7 @@ export function useMappedDistributors(enabled = true) {
       const list = (all ?? []) as MappedDistributor[];
 
       if (isDistributor && ownDistributor) return list.filter((d) => d.id === ownDistributor);
+      if (isBa && ownDistributor) return list.filter((d) => d.id === ownDistributor);
       if (!managerScoped) return list;
 
       const [{ data: profiles }, { data: assignments }] = await Promise.all([
