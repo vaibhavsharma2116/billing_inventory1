@@ -133,13 +133,11 @@ export async function fetchMarginBudget(scope: Scope): Promise<MarginBudget> {
       const free = num(it.free_qty);
       const rate = num(it.rate);
 
-      // Dist has 10% reserved margin on MRP
-      const reservedMargin = isSecondary ? (p.mrp * 10) / 100 : 0;
       // Secondary standard is MRP, primary standard is PTS
       const standard = isSecondary ? p.mrp : p.pts;
 
       row.sales += qty * rate;
-      row.allowed += Math.max(standard - cost - reservedMargin, 0) * qty;
+      row.allowed += Math.max(standard - cost, 0) * qty;
       row.givenBilling += Math.max(standard - rate, 0) * qty;
       row.givenFree += standard * free;
     }

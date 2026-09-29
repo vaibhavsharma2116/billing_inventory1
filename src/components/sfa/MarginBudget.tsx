@@ -118,7 +118,13 @@ export function MarginBudget({ distributorIds = null, csaIds = null, title = "Ma
             </Button>
           ) : null}
           <div className="ml-auto flex flex-wrap gap-2 text-[11px] text-muted-foreground">
-            <Badge variant="secondary">Rate loss {inr(t?.givenBilling)}</Badge>
+            <Badge variant="secondary" className="bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border-emerald-200">
+              Rate Profit (Balance) {inr(t?.balance)}
+            </Badge>
+            <Badge variant="secondary" className="bg-red-50 text-red-700 hover:bg-red-100 border-red-200">
+              Rate Loss (Extra Given) {inr(t?.overspent)}
+            </Badge>
+            <Badge variant="secondary">Billing Diff. {inr(t?.givenBilling)}</Badge>
             <Badge variant="secondary">Free goods {inr(t?.givenFree)}</Badge>
             <Badge variant="secondary">Approved claims {inr(t?.givenClaims)}</Badge>
           </div>
