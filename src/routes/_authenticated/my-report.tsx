@@ -4,6 +4,8 @@ import { useQuery } from "@tanstack/react-query";
 import { BarChart3, CalendarDays, Download, Receipt, ShoppingCart } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useMe } from "@/hooks/useAuth";
+import { useMappedDistributors } from "@/hooks/useMappedDistributors";
+import { useMappedCsas } from "@/hooks/useMappedCsas";
 import { Shell, StatCard, Section } from "@/components/sfa/Shell";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -12,6 +14,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { inr, compactInr } from "@/lib/sfa";
 import { downloadReportPdf, rs, type PdfTable } from "@/lib/report-pdf";
+import { SalesmanStockReport } from "@/components/sfa/SalesmanStockReport";
 
 export const Route = createFileRoute("/_authenticated/my-report")({
   head: () => ({
@@ -311,6 +314,7 @@ function MyReportPage() {
           <TabsTrigger value="type">Sales</TabsTrigger>
           <TabsTrigger value="attendance">Attendance</TabsTrigger>
           <TabsTrigger value="salary">Salary</TabsTrigger>
+          <TabsTrigger value="stock">Stock</TabsTrigger>
         </TabsList>
 
         <TabsContent value="type">
@@ -420,6 +424,10 @@ function MyReportPage() {
               </div>
             )}
           </Section>
+        </TabsContent>
+
+        <TabsContent value="stock">
+          <SalesmanStockReport />
         </TabsContent>
       </Tabs>
     </Shell>
