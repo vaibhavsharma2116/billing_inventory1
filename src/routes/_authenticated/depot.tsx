@@ -83,7 +83,8 @@ function DepotPage() {
     },
   });
 
-  const orders = (data?.orders ?? []).filter((o) => {
+  const orders = data?.orders ?? [];
+  const filteredOrders = orders.filter((o) => {
     if (!orderSearch) return true;
     const q = orderSearch.trim().toLowerCase();
     const csaName = ((o.csas as { name?: string } | null)?.name ?? "").toLowerCase();
@@ -386,10 +387,10 @@ function DepotPage() {
               </div>
             </div>
             <div className="divide-y divide-border/60">
-              {orders.length === 0 ? (
+              {filteredOrders.length === 0 ? (
                 <p className="p-4 text-sm text-muted-foreground">No CSA depot orders yet.</p>
               ) : (
-                orders.map((o) => (
+                filteredOrders.map((o) => (
                   <Link
                     key={o.id}
                     to="/depot-order/$orderId"
