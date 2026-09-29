@@ -14,6 +14,7 @@ import { EditRetailerDialog } from "@/components/sfa/EditRetailerDialog";
 import { MarkVisitDialog } from "@/components/sfa/MarkVisitDialog";
 import { DistributorVisitDialog } from "@/components/sfa/DistributorVisitDialog";
 import { LeaveApply } from "@/components/sfa/LeaveApply";
+import { PaymentHistory } from "@/components/sfa/PaymentHistory";
 import { inr, stockTone } from "@/lib/sfa";
 import { useLocationTracking, tryGetPosition } from "@/hooks/useLocationTracking";
 import { useMappedDistributors } from "@/hooks/useMappedDistributors";
@@ -466,6 +467,7 @@ function SalesmanPage() {
         )}
       </Section>
 
+      <PaymentHistory userId={userId} />
       <LeaveApply userId={userId} />
     </Shell>
   );

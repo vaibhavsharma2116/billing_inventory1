@@ -70,7 +70,7 @@ function PaymentInPage() {
     },
     onSuccess: (amt) => {
       toast.success(`Payment of ${inr(amt)} sent for distributor approval. Outstanding will update after approval.`);
-      for (const key of ["payment-in-retailers", "distributor-panel", "salesman-day", "booking-master"]) {
+      for (const key of ["payment-in-retailers", "distributor-panel", "salesman-day", "booking-master", "payment-in-history"]) {
         qc.invalidateQueries({ queryKey: [key] });
       }
       router.history.back();
