@@ -102,10 +102,10 @@ export async function downloadInvoicePdf(data: InvoicePdfData) {
   y += 18;
   doc.setFont("helvetica", "bold");
   doc.text("Item", 40, y);
-  doc.text("HSN", 250, y);
-  doc.text("MRP", 310, y, { align: "right" });
-  doc.text("Qty", 370, y, { align: "right" });
-  doc.text("Rate", 440, y, { align: "right" });
+  doc.text("HSN", 300, y, { align: "right" });
+  doc.text("MRP", 360, y, { align: "right" });
+  doc.text("Qty", 420, y, { align: "right" });
+  doc.text("Rate", 480, y, { align: "right" });
   doc.text("Amount", W - 40, y, { align: "right" });
   y += 6;
   doc.line(40, y, W - 40, y);
@@ -118,11 +118,11 @@ export async function downloadInvoicePdf(data: InvoicePdfData) {
       y = 60;
     }
     const label = l.freeQty ? `${l.name} (+${l.freeQty} free)` : l.name;
-    doc.text(label.slice(0, 38), 40, y);
-    doc.text((l.hsn || "-").slice(0, 10), 250, y);
-    doc.text(l.mrp ? exactInr(l.mrp).replace("₹", "") : "-", 310, y, { align: "right" });
-    doc.text(String(l.qty), 370, y, { align: "right" });
-    doc.text(exactInr(l.rate).replace("₹", ""), 440, y, { align: "right" });
+    doc.text(label.slice(0, 45), 40, y);
+    doc.text((l.hsn || "-").slice(0, 10), 300, y, { align: "right" });
+    doc.text(l.mrp ? exactInr(l.mrp).replace("₹", "") : "-", 360, y, { align: "right" });
+    doc.text(String(l.qty), 420, y, { align: "right" });
+    doc.text(exactInr(l.rate).replace("₹", ""), 480, y, { align: "right" });
     doc.text(money(l.amount), W - 40, y, { align: "right" });
   }
 
