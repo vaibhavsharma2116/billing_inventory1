@@ -2,7 +2,7 @@ import { useState } from "react";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { Download, Warehouse } from "lucide-react";
+import { Download, Warehouse, Search } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useMe } from "@/hooks/useAuth";
 import { Shell, Section, StatCard } from "@/components/sfa/Shell";
@@ -39,6 +39,8 @@ function DepotPage() {
   const myDepotId = profile?.depot_id ?? null;
   const [openCsa, setOpenCsa] = useState<string | null>(null);
   const [stockSearch, setStockSearch] = useState("");
+  const [ledgerSearch, setLedgerSearch] = useState("");
+  const [orderSearch, setOrderSearch] = useState("");
 
 
 
@@ -81,7 +83,12 @@ function DepotPage() {
     },
   });
 
-  const orders = data?.orders ?? [];
+  const orders = (data?.orders ?? []).filter((o) => {
+    if (!orderSearch) return true;
+    const q = orderSearch.trim().toLowerCase();
+    const csaName = ((o.csas as { name?: string } | null)?.name ?? "").toLowerCase();
+    return o.order_no.toLowerCase().includes(q) || csaName.includes(q);
+  });
   const pending = orders.filter((o) => o.status === "pending");
   const godownOrders = orders.filter((o) => (o.notes ?? "").startsWith("Godown sale"));
   const stockValue = (data?.stock ?? []).reduce(
@@ -115,7 +122,7 @@ function DepotPage() {
         amount: Number(i.net_amount),
       })),
     };
-  });
+  }).filter((c) => !ledgerSearch || c.name.toLowerCase().includes(ledgerSearch.trim().toLowerCase()));
   const payouts = data?.payouts ?? [];
   const payoutTotal = payouts.reduce((s, e) => s + Number(e.total_amount ?? 0), 0);
 
@@ -313,6 +320,12 @@ function DepotPage() {
               </Button>
             }
           >
+            <div className="p-3">
+              <div className="relative">
+                <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+                <Input value={ledgerSearch} onChange={(e) => setLedgerSearch(e.target.value)} placeholder="Search CSA..." className="pl-9 h-9" />
+              </div>
+            </div>
             <div className="divide-y divide-border/60">
               {csaLedger.length === 0 ? (
                 <p className="p-4 text-sm text-muted-foreground">No CSA ledgers yet.</p>
@@ -359,6 +372,12 @@ function DepotPage() {
 
         <TabsContent value="orders">
           <Section title="Depot Orders from CSA">
+            <div className="p-3">
+              <div className="relative">
+                <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+                <Input value={orderSearch} onChange={(e) => setOrderSearch(e.target.value)} placeholder="Search order no. or CSA..." className="pl-9 h-9" />
+              </div>
+            </div>
             <div className="divide-y divide-border/60">
               {orders.length === 0 ? (
                 <p className="p-4 text-sm text-muted-foreground">No CSA depot orders yet.</p>

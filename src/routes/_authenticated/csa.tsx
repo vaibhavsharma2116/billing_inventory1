@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Download } from "lucide-react";
+import { Download, Search } from "lucide-react";
 import { DeliveryList } from "@/components/sfa/DeliveryList";
 import { compactInr, gstBreakup, inr } from "@/lib/sfa";
 import { downloadInvoicePdf } from "@/lib/invoice-pdf";
@@ -34,6 +34,7 @@ function CsaPage() {
   const navigate = useNavigate();
   const [payNote, setPayNote] = useState<Record<string, string>>({});
   const [stockSearch, setStockSearch] = useState("");
+  const [ledgerSearch, setLedgerSearch] = useState("");
   const { data: me } = useMe();
   const myCsaId = (me?.profile?.csa_id as string | null) ?? null;
 
@@ -122,7 +123,9 @@ function CsaPage() {
     queryKey: ["parties", myCsaId],
     queryFn: () => fetchParties(myCsaId),
   });
-  const ledgerParties = (parties ?? []).filter((p) => p.type === "distributor");
+  const ledgerParties = (parties ?? [])
+    .filter((p) => p.type === "distributor")
+    .filter((p) => !ledgerSearch || p.name.toLowerCase().includes(ledgerSearch.trim().toLowerCase()));
 
   const orders = data?.orders ?? [];
   const pending = orders.filter((o) => o.status === "pending");
@@ -580,6 +583,12 @@ function CsaPage() {
               </Button>
             }
           >
+            <div className="p-3">
+              <div className="relative">
+                <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+                <Input value={ledgerSearch} onChange={(e) => setLedgerSearch(e.target.value)} placeholder="Search distributor..." className="pl-9 h-9" />
+              </div>
+            </div>
             <div className="divide-y divide-border/60">
               {ledgerParties.length === 0 ? (
                 <p className="p-4 text-sm text-muted-foreground">No distributor ledgers yet.</p>
