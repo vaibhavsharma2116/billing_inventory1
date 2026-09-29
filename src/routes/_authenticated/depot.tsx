@@ -47,7 +47,7 @@ function DepotPage() {
     queryFn: async () => {
       let orderQ = supabase
         .from("orders")
-        .select("*, csas(*), depots(*), order_items(id, qty, free_qty, rate, amount, products(name))")
+        .select("*, csas(*), depots(*), order_items(id, qty, free_qty, rate, amount, products(name, sku, hsn, mrp))")
         .eq("kind", "depot")
         .order("created_at", { ascending: false });
       if (myDepotId) orderQ = orderQ.eq("depot_id", myDepotId);
@@ -62,7 +62,7 @@ function DepotPage() {
         supabase.from("depots").select("*").order("name"),
         supabase
           .from("invoices")
-          .select("*, orders(order_no, discount_amount, kind, depot_id, csas(*), order_items(id, qty, free_qty, rate, amount, products(name)))")
+          .select("*, orders(order_no, discount_amount, kind, depot_id, csas(*), order_items(id, qty, free_qty, rate, amount, products(name, sku, hsn, mrp)))")
           .order("created_at", { ascending: false }),
         supabase.from("expenses").select("*").order("expense_date", { ascending: false }).limit(200),
       ]);
@@ -482,7 +482,7 @@ function DepotPage() {
                                 qty: it.qty,
                                 freeQty: it.free_qty,
                                 rate: Number(it.rate),
-                                amount: Number(it.amount),
+                                amount: Number(it.amount), hsn: (it.products as any)?.hsn, mrp: (it.products as any)?.mrp,
                               })),
                               discountAmount: Number((ord as any)?.discount_amount) || undefined,
                               taxable: Number(i.taxable_value),

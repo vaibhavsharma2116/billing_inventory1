@@ -75,7 +75,7 @@ function CsaPage() {
       const [orders, stock, distributors, products, csas, invoices, depotOrders] = await Promise.all([
         supabase
           .from("orders")
-          .select("*, distributors(*), order_items(id, qty, free_qty, rate, product_id, products(name))")
+          .select("*, distributors(*), order_items(id, qty, free_qty, rate, product_id, products(name, sku, hsn, mrp))")
           .eq("kind", "primary")
           .order("created_at", { ascending: false }),
         myCsaId
@@ -87,7 +87,7 @@ function CsaPage() {
         supabase
           .from("invoices")
           .select(
-            "*, orders(order_no, discount_amount, kind, csa_id, depot_id, depots(*), distributors(*), order_items(id, qty, free_qty, rate, amount, products(name)))",
+            "*, orders(order_no, discount_amount, kind, csa_id, depot_id, depots(*), distributors(*), order_items(id, qty, free_qty, rate, amount, products(name, sku, hsn, mrp)))",
           )
           .order("created_at", { ascending: false }),
         supabase
@@ -378,7 +378,7 @@ function CsaPage() {
                                 qty: it.qty,
                                 freeQty: it.free_qty,
                                 rate: Number(it.rate),
-                                amount: Number(it.amount),
+                                amount: Number(it.amount), hsn: (it.products as any)?.hsn, mrp: (it.products as any)?.mrp,
                               })),
                               discountAmount: Number((ord as any)?.discount_amount) || undefined,
                               taxable: Number(i.taxable_value),
@@ -443,7 +443,7 @@ function CsaPage() {
                                 qty: it.qty,
                                 freeQty: it.free_qty,
                                 rate: Number(it.rate),
-                                amount: Number(it.amount),
+                                amount: Number(it.amount), hsn: (it.products as any)?.hsn, mrp: (it.products as any)?.mrp,
                               })),
                               discountAmount: Number((ord as any)?.discount_amount) || undefined,
                               taxable: Number(i.taxable_value),

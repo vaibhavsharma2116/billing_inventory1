@@ -7,6 +7,8 @@ export type InvoicePdfLine = {
   freeQty?: number;
   rate: number;
   amount: number;
+  hsn?: string | null;
+  mrp?: number | null;
 };
 
 export type InvoiceParty = {
@@ -100,8 +102,10 @@ export async function downloadInvoicePdf(data: InvoicePdfData) {
   y += 18;
   doc.setFont("helvetica", "bold");
   doc.text("Item", 40, y);
-  doc.text("Qty", 320, y, { align: "right" });
-  doc.text("Rate", 400, y, { align: "right" });
+  doc.text("HSN", 250, y);
+  doc.text("MRP", 310, y, { align: "right" });
+  doc.text("Qty", 370, y, { align: "right" });
+  doc.text("Rate", 440, y, { align: "right" });
   doc.text("Amount", W - 40, y, { align: "right" });
   y += 6;
   doc.line(40, y, W - 40, y);
@@ -114,9 +118,11 @@ export async function downloadInvoicePdf(data: InvoicePdfData) {
       y = 60;
     }
     const label = l.freeQty ? `${l.name} (+${l.freeQty} free)` : l.name;
-    doc.text(label.slice(0, 48), 40, y);
-    doc.text(String(l.qty), 320, y, { align: "right" });
-    doc.text(exactInr(l.rate).replace("₹", "Rs. "), 400, y, { align: "right" });
+    doc.text(label.slice(0, 38), 40, y);
+    doc.text((l.hsn || "-").slice(0, 10), 250, y);
+    doc.text(l.mrp ? exactInr(l.mrp).replace("₹", "") : "-", 310, y, { align: "right" });
+    doc.text(String(l.qty), 370, y, { align: "right" });
+    doc.text(exactInr(l.rate).replace("₹", ""), 440, y, { align: "right" });
     doc.text(money(l.amount), W - 40, y, { align: "right" });
   }
 

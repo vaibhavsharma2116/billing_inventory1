@@ -61,14 +61,14 @@ function DistributorPage() {
     queryFn: async () => {
       let purchaseQ = supabase
         .from("orders")
-        .select("*, csas(*), order_items(id, qty, free_qty, rate, amount, product_id, products(name, sku))")
+        .select("*, csas(*), order_items(id, qty, free_qty, rate, amount, product_id, products(name, sku, hsn, mrp))")
         .eq("kind", "primary")
         .order("created_at", { ascending: false });
       if (myDistributorId) purchaseQ = purchaseQ.eq("distributor_id", myDistributorId);
 
       let purchaseInvQ = supabase
         .from("invoices")
-        .select("*, orders!inner(order_no, discount_amount, kind, csa_id, distributor_id, csas(*), order_items(id, qty, free_qty, rate, amount, products(name)))")
+        .select("*, orders!inner(order_no, discount_amount, kind, csa_id, distributor_id, csas(*), order_items(id, qty, free_qty, rate, amount, products(name, sku, hsn, mrp)))")
         .eq("orders.kind", "primary")
         .order("created_at", { ascending: false });
       if (myDistributorId) purchaseInvQ = purchaseInvQ.eq("orders.distributor_id", myDistributorId);
@@ -77,7 +77,7 @@ function DistributorPage() {
         await Promise.all([
         supabase
           .from("orders")
-          .select("*, retailers(*), order_items(id, qty, free_qty, rate, amount, product_id, products(name, sku))")
+          .select("*, retailers(*), order_items(id, qty, free_qty, rate, amount, product_id, products(name, sku, hsn, mrp))")
           .eq("kind", "secondary")
           .order("created_at", { ascending: false }),
         (myDistributorId
@@ -93,7 +93,7 @@ function DistributorPage() {
         supabase
           .from("invoices")
           .select(
-            "*, orders(order_no, discount_amount, distributor_id, retailers(*), order_items(id, qty, free_qty, rate, amount, products(name)))",
+            "*, orders(order_no, discount_amount, distributor_id, retailers(*), order_items(id, qty, free_qty, rate, amount, products(name, sku, hsn, mrp)))",
           )
           .order("created_at", { ascending: false }),
         supabase.from("distributors").select("*"),
@@ -737,7 +737,9 @@ function DistributorPage() {
                                 qty: it.qty,
                                 freeQty: it.free_qty,
                                 rate: Number(it.rate),
-                                amount: Number(it.amount),
+                                amount: Number(it.amount), hsn: (it.products as any)?.hsn, mrp: (it.products as any)?.mrp,
+                                hsn: (it.products as any)?.hsn,
+                                mrp: (it.products as any)?.mrp,
                               })),
                               discountAmount: Number((ord as any)?.discount_amount) || undefined,
                               taxable: Number(i.taxable_value),
@@ -797,7 +799,7 @@ function DistributorPage() {
                                   qty: it.qty,
                                   freeQty: it.free_qty,
                                   rate: Number(it.rate),
-                                  amount: Number(it.amount),
+                                  amount: Number(it.amount), hsn: (it.products as any)?.hsn, mrp: (it.products as any)?.mrp,
                                 })),
                                 discountAmount: Number((o as any)?.discount_amount) || undefined,
                                 taxable,
@@ -869,7 +871,7 @@ function DistributorPage() {
                                 qty: it.qty,
                                 freeQty: it.free_qty,
                                 rate: Number(it.rate),
-                                amount: Number(it.amount),
+                                amount: Number(it.amount), hsn: (it.products as any)?.hsn, mrp: (it.products as any)?.mrp,
                               })),
                               discountAmount: Number((ord as any)?.discount_amount) || undefined,
                               taxable: Number(i.taxable_value),
