@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
@@ -43,6 +43,7 @@ function ClaimsPage() {
   const [invoiceNo, setInvoiceNo] = useState("");
   const [notes, setNotes] = useState("");
   const [file, setFile] = useState<File | null>(null);
+  const fileRef = useRef<HTMLInputElement>(null);
 
   const { data: retailers } = useQuery({
     queryKey: ["claim-retailers", myDistributorId],
@@ -105,6 +106,7 @@ function ClaimsPage() {
       setInvoiceNo("");
       setNotes("");
       setFile(null);
+      if (fileRef.current) fileRef.current.value = "";
       qc.invalidateQueries({ queryKey: ["my-claims"] });
     },
     onError: (e: Error) => toast.error(e.message),
@@ -179,6 +181,7 @@ function ClaimsPage() {
             <Input
               id="invfile"
               type="file"
+              ref={fileRef}
               accept="application/pdf,image/*"
               onChange={(e) => setFile(e.target.files?.[0] ?? null)}
               className="h-9"
