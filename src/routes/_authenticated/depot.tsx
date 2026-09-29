@@ -243,7 +243,14 @@ function DepotPage() {
         </TabsContent>
 
         <TabsContent value="paymentin">
-          <Section title="Payment In — bills receivable from CSAs">
+          <Section 
+            title="Payment In — bills receivable from CSAs"
+            action={
+              <Button asChild size="sm">
+                <Link to="/payment-in">Manual Payment In</Link>
+              </Button>
+            }
+          >
             <div className="divide-y divide-border/60">
               {(data?.invoices ?? []).length === 0 ? (
                 <p className="p-4 text-sm text-muted-foreground">No CSA bills yet.</p>

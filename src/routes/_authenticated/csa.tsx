@@ -472,7 +472,7 @@ function CsaPage() {
             title="Payments from Distributors"
             action={
               <Button asChild size="sm">
-                <Link to="/payment-out">Manual Payment In</Link>
+                <Link to="/payment-in">Manual Payment In</Link>
               </Button>
             }
           >
