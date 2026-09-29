@@ -41,11 +41,19 @@ async function assertAdmin(supabase: any, userId: string) {
 export const listAppUsers = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
-    await assertAdmin(context.supabase, context.userId);
+    try {
+      await assertAdmin(context.supabase, context.userId);
+    } catch (err) {
+      console.error("[listAppUsers] assertAdmin failed:", err);
+      throw err;
+    }
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
     const { data: authUsers, error } = await supabaseAdmin.auth.admin.listUsers({ page: 1, perPage: 200 });
-    if (error) throw new Error(error.message);
+    if (error) {
+      console.error("[listAppUsers] Error fetching from auth.admin:", error);
+      throw new Error(error.message);
+    }
 
     const ids = authUsers.users.map((u) => u.id);
     const { data: profiles } = await supabaseAdmin.from("profiles").select("*").in("id", ids);

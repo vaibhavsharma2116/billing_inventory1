@@ -7,11 +7,8 @@ envFile.split('\n').forEach(line => {
   const [key, value] = line.split('=');
   if (key && value) env[key.trim()] = value.trim().replace(/^"|"$/g, '');
 });
+process.env.SUPABASE_URL = env.SUPABASE_URL;
+process.env.SUPABASE_SERVICE_ROLE_KEY = env.SUPABASE_SERVICE_ROLE_KEY;
 
-const sb = createClient(env.SUPABASE_URL, env.SUPABASE_SERVICE_ROLE_KEY);
-sb.auth.admin.listUsers({ page: 1, perPage: 200 })
-  .then(res => {
-    console.log("Users:", res.data?.users?.length);
-    if (res.error) console.error("Error:", res.error);
-  })
-  .catch(console.error);
+// Mock import of the compiled module, wait, we are in a TS project.
+// We can use tsx or ts-node to run the typescript file directly!

@@ -1,7 +1,8 @@
 import type { ReactNode, ComponentType } from "react";
 import { Link, useNavigate } from "@tanstack/react-router";
+import { useEffect, useState } from "react";
 import type { LucideProps } from "lucide-react";
-import { Home, LogOut } from "lucide-react";
+import { Home, LogOut, Download } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -13,6 +14,52 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+
+function InstallAppButton() {
+  const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
+  const [isInstalled, setIsInstalled] = useState(false);
+
+  useEffect(() => {
+    if (window.matchMedia('(display-mode: standalone)').matches) {
+      setIsInstalled(true);
+    }
+    const handleBeforeInstallPrompt = (e: any) => {
+      e.preventDefault();
+      setDeferredPrompt(e);
+    };
+    window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+    const handleAppInstalled = () => {
+      setIsInstalled(true);
+      setDeferredPrompt(null);
+    };
+    window.addEventListener('appinstalled', handleAppInstalled);
+    return () => {
+      window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+      window.removeEventListener('appinstalled', handleAppInstalled);
+    };
+  }, []);
+
+  if (isInstalled || !deferredPrompt) return null;
+
+  return (
+    <Button
+      variant="ghost"
+      size="sm"
+      className="text-plum-foreground hover:bg-plum-foreground/10"
+      onClick={async () => {
+        if (!deferredPrompt) return;
+        deferredPrompt.prompt();
+        const { outcome } = await deferredPrompt.userChoice;
+        if (outcome === 'accepted') {
+          setDeferredPrompt(null);
+        }
+      }}
+    >
+      <Download className="size-4" /> <span className="hidden sm:inline">Install</span>
+    </Button>
+  );
+}
+
 
 export type NavItem = { to: string; label: string; icon?: ComponentType<LucideProps> };
 
@@ -71,6 +118,7 @@ export function Shell({
           </div>
           <div className="flex items-center gap-1">
             <RoleSwitcher />
+            <InstallAppButton />
             <Button
               variant="ghost"
               size="sm"

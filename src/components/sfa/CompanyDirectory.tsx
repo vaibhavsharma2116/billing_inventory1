@@ -62,7 +62,7 @@ export function CompanyDirectory() {
   const [search, setSearch] = useState("");
   const [openId, setOpenId] = useState<string | null>(null);
 
-  const { data: users, isLoading } = useQuery({
+  const { data: users, isLoading, error } = useQuery({
     queryKey: ["admin-app-users"],
     queryFn: () => list(),
   });
@@ -141,6 +141,7 @@ export function CompanyDirectory() {
 
         <div className="space-y-2 px-3 pb-3">
           {isLoading ? <p className="text-sm text-muted-foreground">Loading…</p> : null}
+          {error ? <p className="text-sm text-destructive">Error loading users: {error.message}</p> : null}
           {paged.map((u) => (
             <div key={u.id} className="rounded-2xl border border-border/60 p-3">
               <div className="flex flex-wrap items-start justify-between gap-2">
