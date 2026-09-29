@@ -77,7 +77,7 @@ function PartyLedgerListPage() {
                 <div className="min-w-0 flex-1">
                   <p className="truncate font-medium">{p.name}</p>
                   <p className="text-[11px] text-muted-foreground">
-                    {p.type === "retailer" ? "Retailer" : "Distributor"} • {p.area} • Billed {inr(p.billed)} • Paid {inr(p.received)}
+                    {p.type === "retailer" ? "Retailer" : p.type === "csa" ? "CSA" : "Distributor"} • {p.area} • Billed {inr(p.billed)} • Paid {inr(p.received)}
                   </p>
                 </div>
                 <span className="shrink-0 text-right font-semibold tabular-nums">{inr(p.balance)}</span>

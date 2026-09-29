@@ -1,6 +1,6 @@
 import { supabase } from "@/integrations/supabase/client";
 
-export type PartyType = "retailer" | "distributor";
+export type PartyType = "retailer" | "distributor" | "csa";
 
 export type LedgerBill = {
   id: string;
@@ -59,28 +59,32 @@ export async function fetchParties(csaId?: string | null, depotId?: string | nul
       .in("csa_id", csaIds);
   }
 
-  const [retailers, distributors, invoices, collections] = await Promise.all([
+  const [retailers, distributors, csas, invoices, collections] = await Promise.all([
     supabase.from("retailers").select("id, name, city, outstanding, distributor_id"),
     distributorsQuery,
-    supabase.from("invoices").select("net_amount, orders(retailer_id, distributor_id)"),
-    supabase.from("collections").select("amount, retailer_id").eq("status", "approved"),
+    (!csaId && depotId) ? supabase.from("csas").select("id, name, city, state, depot_id").eq("depot_id", depotId) : Promise.resolve({ data: [] }),
+    supabase.from("invoices").select("net_amount, orders(retailer_id, distributor_id, csa_id)"),
+    supabase.from("collections").select("amount, retailer_id, distributor_id, csa_id").eq("status", "approved"),
   ]);
 
   const billed = new Map<string, number>();
   for (const i of invoices.data ?? []) {
-    const o = i.orders as { retailer_id: string | null; distributor_id: string | null } | null;
+    const o = i.orders as { retailer_id: string | null; distributor_id: string | null; csa_id: string | null } | null;
     // Retailer billing counts only against the retailer; distributor billed
     // counts only primary billing (orders with no retailer attached).
     if (o?.retailer_id) {
       billed.set(o.retailer_id, (billed.get(o.retailer_id) ?? 0) + Number(i.net_amount));
     } else if (o?.distributor_id) {
       billed.set(o.distributor_id, (billed.get(o.distributor_id) ?? 0) + Number(i.net_amount));
+    } else if (o?.csa_id) {
+      billed.set(o.csa_id, (billed.get(o.csa_id) ?? 0) + Number(i.net_amount));
     }
   }
   const received = new Map<string, number>();
   for (const c of collections.data ?? []) {
-    if (!c.retailer_id) continue;
-    received.set(c.retailer_id, (received.get(c.retailer_id) ?? 0) + Number(c.amount));
+    const id = c.retailer_id || c.distributor_id || c.csa_id;
+    if (!id) continue;
+    received.set(id, (received.get(id) ?? 0) + Number(c.amount));
   }
 
   const rows: PartySummary[] = [];
@@ -103,14 +107,28 @@ export async function fetchParties(csaId?: string | null, depotId?: string | nul
   }
   for (const d of distributors.data ?? []) {
     const b = billed.get(d.id) ?? 0;
+    const p = received.get(d.id) ?? 0;
     rows.push({
       id: d.id,
       type: "distributor",
       name: d.name,
       area: [d.city, d.state].filter(Boolean).join(", ") || "—",
       billed: b,
-      received: 0,
-      balance: b || Number(d.outstanding ?? 0),
+      received: p,
+      balance: b - p || Number(d.outstanding ?? 0),
+    });
+  }
+  for (const c of csas.data ?? []) {
+    const b = billed.get(c.id) ?? 0;
+    const p = received.get(c.id) ?? 0;
+    rows.push({
+      id: c.id,
+      type: "csa",
+      name: c.name,
+      area: [c.city, c.state].filter(Boolean).join(", ") || "—",
+      billed: b,
+      received: p,
+      balance: b - p,
     });
   }
   return rows.sort((a, b) => b.balance - a.balance);
@@ -127,7 +145,9 @@ export async function fetchPartyLedger(
   const partyRes =
     type === "retailer"
       ? await supabase.from("retailers").select("id, name, city, credit_limit, distributor_id").eq("id", id).maybeSingle()
-      : await supabase.from("distributors").select("id, name, city, state, csa_id").eq("id", id).maybeSingle();
+      : type === "distributor"
+      ? await supabase.from("distributors").select("id, name, city, state, csa_id").eq("id", id).maybeSingle()
+      : await supabase.from("csas").select("id, name, city, state, depot_id").eq("id", id).maybeSingle();
 
   if (type === "distributor" && csaId) {
     const d = partyRes.data as { csa_id?: string | null } | null;
@@ -139,7 +159,12 @@ export async function fetchPartyLedger(
   if (depotId && !csaId) {
     const { data: depotCsas } = await supabase.from("csas").select("id").eq("depot_id", depotId);
     const csaIds = new Set((depotCsas ?? []).map((c) => c.id));
-    if (type === "distributor") {
+    if (type === "csa") {
+      const c = partyRes.data as { depot_id?: string | null } | null;
+      if (c?.depot_id !== depotId) {
+        throw new Error("This CSA is not mapped to your depot.");
+      }
+    } else if (type === "distributor") {
       const d = partyRes.data as { csa_id?: string | null } | null;
       if (!d?.csa_id || !csaIds.has(d.csa_id)) {
         throw new Error("This distributor is not mapped to your depot.");
@@ -159,24 +184,27 @@ export async function fetchPartyLedger(
     }
   }
 
-  const invCol = type === "retailer" ? "orders.retailer_id" : "orders.distributor_id";
+  const invCol = type === "retailer" ? "orders.retailer_id" : type === "distributor" ? "orders.distributor_id" : "orders.csa_id";
   let invQuery = supabase
     .from("invoices")
-    .select("id, invoice_no, net_amount, created_at, orders!inner(order_no, retailer_id, distributor_id)")
+    .select("id, invoice_no, net_amount, created_at, orders!inner(order_no, retailer_id, distributor_id, csa_id)")
     .eq(invCol, id)
     .order("created_at", { ascending: true });
   // Distributor ledger shows only its own primary billing, never retailer sales routed through it.
   if (type === "distributor") invQuery = invQuery.is("orders.retailer_id", null);
+  // CSA ledger shows only its own depot billing, never distributor sales routed through it.
+  if (type === "csa") invQuery = invQuery.is("orders.retailer_id", null).is("orders.distributor_id", null);
+
+  const colField = type === "retailer" ? "retailer_id" : type === "distributor" ? "distributor_id" : "csa_id";
+
   const [invoices, collections] = await Promise.all([
     invQuery,
-    type === "retailer"
-      ? supabase
-          .from("collections")
-          .select("id, amount, mode, reference, created_at")
-          .eq("retailer_id", id)
-          .eq("status", "approved")
-          .order("created_at", { ascending: true })
-      : Promise.resolve({ data: [] as { id: string; amount: number; mode: string; reference: string | null; created_at: string }[] }),
+    supabase
+      .from("collections")
+      .select("id, amount, mode, reference, created_at")
+      .eq(colField, id)
+      .eq("status", "approved")
+      .order("created_at", { ascending: true }),
   ]);
 
   const p = partyRes.data as
