@@ -222,8 +222,11 @@ function BaPage() {
     },
     onSuccess: () => {
       toast.success("Sale recorded");
+      setSaleProduct("");
       setSaleQty("1");
+      setSaleRate("");
       setSaleNote("");
+      setSaleSearch("");
       qc.invalidateQueries({ queryKey: ["ba-day"] });
     },
     onError: (e: Error) => toast.error(e.message),
@@ -249,8 +252,10 @@ function BaPage() {
     },
     onSuccess: () => {
       toast.success(inKind === "opening" ? "Opening stock saved" : "Stock added to counter");
+      setInProduct("");
       setInQty("");
       setInRef("");
+      setInSearch("");
       qc.invalidateQueries({ queryKey: ["ba-day"] });
     },
     onError: (e: Error) => toast.error(e.message),
