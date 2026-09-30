@@ -55,6 +55,8 @@ function GodownSalePage() {
   const [discount, setDiscount] = useState("");
   const [discountType, setDiscountType] = useState<"amount" | "percentage">("amount");
 
+
+
   const { data } = useQuery({
     queryKey: ["godown-sale-master", level, ownerId],
     queryFn: async () => {
@@ -201,6 +203,21 @@ function GodownSalePage() {
     onError: (e: Error) => toast.error(e.message),
   });
 
+
+  if (!isDepot && !isCsa && !myDistributorId) {
+    return (
+      <Shell title="Godown Billing">
+        <div className="flex min-h-[50vh] flex-col items-center justify-center p-6 text-center">
+          <p className="text-muted-foreground">
+            Godown billing is not available for your current role. Please use a specific Depot, CSA, or Distributor account.
+          </p>
+          <Button variant="outline" className="mt-4" onClick={() => router.history.back()}>
+            Go Back
+          </Button>
+        </div>
+      </Shell>
+    );
+  }
 
   return (
     <Shell title="Godown Billing" subtitle="Manual counter billing • instant GST invoice">

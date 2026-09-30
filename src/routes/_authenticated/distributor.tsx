@@ -440,7 +440,7 @@ function DistributorPage() {
             title="Payments Received"
             action={
               <Button asChild size="sm">
-                <Link to="/payment-in" search={{ retailer: "" }}>
+                <Link to="/payment-in" search={{ partyId: "" }}>
                   <IndianRupee className="mr-1 size-3.5" /> Payment In
                 </Link>
               </Button>
@@ -737,8 +737,8 @@ function DistributorPage() {
                                 qty: it.qty,
                                 freeQty: it.free_qty,
                                 rate: Number(it.rate),
-                                amount: Number(it.amount), hsn: (it.products as any)?.hsn, mrp: (it.products as any)?.mrp,
-                                hsn: (it.products as any)?.hsn,
+                                amount: Number(it.amount), 
+                                hsn: (it.products as any)?.hsn, 
                                 mrp: (it.products as any)?.mrp,
                               })),
                               discountAmount: Number((ord as any)?.discount_amount) || undefined,

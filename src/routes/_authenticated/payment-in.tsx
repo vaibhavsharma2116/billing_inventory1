@@ -81,7 +81,7 @@ function PaymentInPage() {
         mode,
         reference: reference || null,
         status,
-      });
+      } as any);
       if (error) throw error;
       return { amt, status };
     },

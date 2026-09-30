@@ -347,7 +347,7 @@ function SalesmanPage() {
         action={
           <div className="flex items-center gap-2">
             <Button asChild size="sm">
-              <Link to="/payment-in" search={{ retailer: "" }}>
+              <Link to="/payment-in" search={{ partyId: "" }}>
                 Payment In
               </Link>
             </Button>
@@ -432,7 +432,7 @@ function SalesmanPage() {
                   }
                 />
                 <Button asChild className="h-9 px-3 text-xs shadow-sm">
-                  <Link to="/payment-in" search={{ retailer: r.id }}>
+                  <Link to="/payment-in" search={{ partyId: r.id }}>
                     Payment
                   </Link>
                 </Button>

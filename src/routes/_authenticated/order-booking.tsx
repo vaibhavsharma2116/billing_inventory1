@@ -469,7 +469,7 @@ function OrderBooking() {
                   </div>
                   <div className="text-right">
                     <p className="font-semibold">{inr(o.total_amount)}</p>
-                    <Badge variant="outline" className={`mt-1 text-[10px] capitalize ${o.status === "delivered" ? "text-success border-success/30" : o.status === "cancelled" ? "text-destructive border-destructive/30" : "text-amber-600 border-amber-600/30"}`}>
+                    <Badge variant="outline" className={`mt-1 text-[10px] capitalize ${o.status === "delivered" ? "text-success border-success/30" : o.status === "rejected" ? "text-destructive border-destructive/30" : "text-amber-600 border-amber-600/30"}`}>
                       {o.status}
                     </Badge>
                   </div>

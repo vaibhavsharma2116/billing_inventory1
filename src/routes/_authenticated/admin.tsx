@@ -134,7 +134,7 @@ function AdminPage() {
       const [orders, invoices, collections, csas, distributors, retailers, profiles, attendance, stock, leaves] =
         await Promise.all([
           (supabase.from("orders") as any).select(
-            "id, kind, status, total_amount, created_at, order_no, salesman_id, retailers(name, city, area, pincode), distributors(name, city, state)",
+            "id, kind, status, total_amount, created_at, order_no, salesman_id, retailers(name, city, area, pincode), distributors(name, city, state), csas(name, city, state), depots(name, city)",
           ),
           supabase.from("invoices").select("net_amount"),
           supabase.from("collections").select("amount"),
@@ -182,10 +182,12 @@ function AdminPage() {
       orders.map((o: any) => {
         const r = o.retailers as { name: string; city?: string | null; area?: string | null; pincode?: string | null } | null;
         const d = o.distributors as { name: string; city?: string | null } | null;
+        const c = o.csas as { name: string; city?: string | null } | null;
+        const dp = o.depots as { name: string; city?: string | null } | null;
         return {
           key: o.id,
           label: o.order_no,
-          sub: `${o.kind} • ${r?.name ?? d?.name ?? "Distributor order"}`,
+          sub: `${o.kind} • ${r?.name ?? d?.name ?? c?.name ?? dp?.name ?? "Company order"}`,
           value: inr(o.total_amount),
           status: o.status,
           city: r?.city ?? d?.city ?? null,

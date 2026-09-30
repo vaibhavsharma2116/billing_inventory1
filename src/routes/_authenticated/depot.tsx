@@ -248,7 +248,7 @@ function DepotPage() {
             title="Payment In — bills receivable from CSAs"
             action={
               <Button asChild size="sm">
-                <Link to="/payment-in">Manual Payment In</Link>
+                <Link to="/payment-in" search={{ partyId: "" }}>Manual Payment In</Link>
               </Button>
             }
           >

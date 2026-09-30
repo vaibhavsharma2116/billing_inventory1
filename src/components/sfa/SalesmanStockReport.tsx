@@ -83,7 +83,7 @@ export function SalesmanStockReport() {
 
   const grouped = locFiltered.reduce((acc, row) => {
     if (!acc[row.location]) acc[row.location] = [];
-    acc[row.location].push(row);
+    acc[row.location]!.push(row);
     return acc;
   }, {} as Record<string, typeof filtered>);
 

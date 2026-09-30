@@ -24,7 +24,7 @@ export async function fetchAdminPanel() {
     await Promise.all([
       (supabase.from("orders") as any)
         .select(
-          "id, kind, status, total_amount, created_at, order_no, retailer_id, distributor_id, salesman_id, retailers(name, city, area, pincode), distributors(name, city, state)",
+          "id, kind, status, total_amount, created_at, order_no, retailer_id, distributor_id, salesman_id, retailers(name, city, area, pincode), distributors(name, city, state), csas(name, city, state), depots(name, city)",
         )
         .order("created_at", { ascending: false }),
       supabase.from("invoices").select("id, invoice_no, net_amount, created_at, order_id").order("created_at", { ascending: false }),
@@ -79,12 +79,14 @@ export function buildAdminReports(data: AdminPanel): Record<string, AdminReport>
     list.map((o: any) => {
       const r = o.retailers as { name: string; city?: string | null; area?: string | null; pincode?: string | null } | null;
       const dist = o.distributors as { name: string; city?: string | null } | null;
+      const csa = o.csas as { name: string; city?: string | null } | null;
+      const dp = o.depots as { name: string; city?: string | null } | null;
       return {
         key: o.id,
         label: o.order_no,
-        sub: `${party === "primary" ? (dist?.name ?? "Distributor") : (r?.name ?? "Retailer")} • ${o.status} • ${dateStr(o.created_at)}`,
+        sub: `${party === "primary" ? (dist?.name ?? "Distributor") : party === "secondary" ? (r?.name ?? "Retailer") : (csa?.name ?? dp?.name ?? "CSA")} • ${o.status} • ${dateStr(o.created_at)}`,
         value: inr(o.total_amount),
-        city: party === "primary" ? dist?.city ?? null : r?.city ?? null,
+        city: party === "primary" ? dist?.city ?? null : party === "secondary" ? r?.city ?? null : csa?.city ?? dp?.city ?? null,
         area: r?.area ?? null,
         pincode: r?.pincode ?? null,
         salesman: o.salesman_id ? nameOf(o.salesman_id) : null,
@@ -193,12 +195,14 @@ export function buildAdminReports(data: AdminPanel): Record<string, AdminReport>
       rows: (pendingOrders as any[]).map((o: any) => {
         const r = o.retailers as { name: string; city?: string | null; area?: string | null; pincode?: string | null } | null;
         const dist = o.distributors as { name: string; city?: string | null } | null;
+        const csa = o.csas as { name: string; city?: string | null } | null;
+        const dp = o.depots as { name: string; city?: string | null } | null;
         return {
           key: o.id,
           label: o.order_no,
-          sub: `${o.kind} • ${r?.name ?? dist?.name ?? "—"} • ${dateStr(o.created_at)}`,
+          sub: `${o.kind} • ${r?.name ?? dist?.name ?? csa?.name ?? dp?.name ?? "—"} • ${dateStr(o.created_at)}`,
           value: inr(o.total_amount),
-          city: r?.city ?? dist?.city ?? null,
+          city: r?.city ?? dist?.city ?? csa?.city ?? dp?.city ?? null,
           area: r?.area ?? null,
           pincode: r?.pincode ?? null,
           salesman: o.salesman_id ? nameOf(o.salesman_id) : null,

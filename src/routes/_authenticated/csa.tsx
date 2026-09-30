@@ -80,8 +80,8 @@ function CsaPage() {
           .eq("kind", "primary")
           .order("created_at", { ascending: false }),
         myCsaId
-          ? supabase.from("csa_stock").select("*, products(name, sku, pts)").eq("csa_id", myCsaId)
-          : supabase.from("csa_stock").select("*, products(name, sku, pts)"),
+          ? supabase.from("csa_stock").select("*, products(name, sku, pts), csas(name)").eq("csa_id", myCsaId)
+          : supabase.from("csa_stock").select("*, products(name, sku, pts), csas(name)"),
         supabase.from("distributors").select("*"),
         supabase.from("products").select("*").order("name"),
         supabase.from("csas").select("*"),
@@ -312,9 +312,11 @@ function CsaPage() {
               ) : (
                 filteredStock.map((s) => {
                   const p = s.products as { name: string; sku?: string } | null;
+                  const csaName = (s.csas as { name: string } | null)?.name;
                   return (
                     <div key={s.id} className="flex items-center justify-between p-3 text-sm">
                       <span>
+                        {csaName ? <span className="mr-2 text-xs font-semibold text-primary/70">[{csaName}]</span> : null}
                         {p?.name}
                         {p?.sku ? <span className="ml-2 text-xs text-muted-foreground">{p.sku}</span> : null}
                       </span>
@@ -472,7 +474,7 @@ function CsaPage() {
             title="Payments from Distributors"
             action={
               <Button asChild size="sm">
-                <Link to="/payment-in">Manual Payment In</Link>
+                <Link to="/payment-in" search={{ partyId: "" }}>Manual Payment In</Link>
               </Button>
             }
           >
