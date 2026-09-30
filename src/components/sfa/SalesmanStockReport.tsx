@@ -5,14 +5,23 @@ import { useMappedCsas } from "@/hooks/useMappedCsas";
 import { Section } from "@/components/sfa/Shell";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Download } from "lucide-react";
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { downloadReportPdf } from "@/lib/report-pdf";
 
 export function SalesmanStockReport() {
   const { data: mappedDistributors = [] } = useMappedDistributors();
   const { data: mappedCsas = [] } = useMappedCsas();
   const [q, setQ] = useState("");
+  const [selectedLoc, setSelectedLoc] = useState("all");
+
+  const locationOptions = useMemo(() => {
+    const opts: string[] = [];
+    mappedDistributors.forEach(d => opts.push(`${d.name} (Distributor)`));
+    mappedCsas.forEach(c => opts.push(`${c.name} (CSA)`));
+    return opts;
+  }, [mappedDistributors, mappedCsas]);
 
   const distIds = mappedDistributors.map((d) => d.id);
   const csaIds = mappedCsas.map((c) => c.id);
@@ -70,7 +79,9 @@ export function SalesmanStockReport() {
       )
     : stock;
 
-  const grouped = filtered.reduce((acc, row) => {
+  const locFiltered = selectedLoc === "all" ? filtered : filtered.filter(r => r.location === selectedLoc);
+
+  const grouped = locFiltered.reduce((acc, row) => {
     if (!acc[row.location]) acc[row.location] = [];
     acc[row.location].push(row);
     return acc;
@@ -80,8 +91,8 @@ export function SalesmanStockReport() {
     downloadReportPdf({
       fileName: `stock-statement.pdf`,
       title: "Mapped Stock Statement",
-      subtitle: new Date().toLocaleDateString("en-IN"),
-      meta: [`Total items: ${filtered.length}`, `Distributors mapped: ${distIds.length}`, `CSAs mapped: ${csaIds.length}`],
+      subtitle: selectedLoc === "all" ? new Date().toLocaleDateString("en-IN") : `${selectedLoc} • ${new Date().toLocaleDateString("en-IN")}`,
+      meta: [`Total items: ${locFiltered.length}`, `Distributors mapped: ${distIds.length}`, `CSAs mapped: ${csaIds.length}`],
       tables: Object.entries(grouped).map(([loc, items]) => ({
         title: `Stock at ${loc}`,
         head: ["Product / SKU", "Qty"],
@@ -93,6 +104,22 @@ export function SalesmanStockReport() {
 
   return (
     <div className="mt-4">
+      {locationOptions.length > 0 && (
+        <div className="mb-3">
+          <Select value={selectedLoc} onValueChange={setSelectedLoc}>
+            <SelectTrigger className="w-full bg-card">
+              <SelectValue placeholder="Filter by distributor/CSA" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All mapped locations</SelectItem>
+              {locationOptions.map(opt => (
+                <SelectItem key={opt} value={opt}>{opt}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+      )}
+      
       <div className="mb-3 flex items-center gap-2">
         <Input
           value={q}
@@ -109,7 +136,7 @@ export function SalesmanStockReport() {
       <Section
         title="Current Stock Statement"
         action={
-          <Button size="sm" variant="outline" onClick={downloadPdf} disabled={filtered.length === 0}>
+          <Button size="sm" variant="outline" onClick={downloadPdf} disabled={locFiltered.length === 0}>
             <Download className="mr-2 h-4 w-4" /> PDF
           </Button>
         }
