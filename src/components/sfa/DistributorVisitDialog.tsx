@@ -5,7 +5,6 @@ import { Building2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useMe } from "@/hooks/useAuth";
 import { useMappedCsas } from "@/hooks/useMappedCsas";
-import { useMappedDistributors } from "@/hooks/useMappedDistributors";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -32,19 +31,16 @@ export function DistributorVisitDialog({
   const qc = useQueryClient();
   const [open, setOpen] = useState(false);
   
-  const [visitType, setVisitType] = useState<"distributor" | "csa">("distributor");
-  const { data: distributors = [] } = useMappedDistributors(open && visitType === "distributor");
-  const { data: csas = [] } = useMappedCsas(open && visitType === "csa");
+  const { data: csas = [] } = useMappedCsas(open);
 
-  const [partyId, setPartyId] = useState<string>("");
+  const [partyId, setPartyId] = useState<string>("none");
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
   const [address, setAddress] = useState("");
   const [notes, setNotes] = useState("");
 
   const reset = () => {
-    setVisitType("distributor");
-    setPartyId("");
+    setPartyId("none");
     setName("");
     setPhone("");
     setAddress("");
@@ -56,18 +52,24 @@ export function DistributorVisitDialog({
       const userId = me?.profile?.id;
       if (!userId) throw new Error("Not signed in");
       
-      const isDistributor = visitType === "distributor";
-      const picked = isDistributor 
-        ? distributors.find((d) => d.id === partyId)
-        : csas.find((c) => c.id === partyId);
+      const pickedCsa = partyId && partyId !== "none" ? csas.find((c) => c.id === partyId) : null;
+      let finalName = "";
+      
+      const trimmedName = name.trim();
+      if (pickedCsa && trimmedName) {
+        finalName = `${trimmedName} — under ${pickedCsa.name} (CSA)`;
+      } else if (pickedCsa) {
+        finalName = `${pickedCsa.name} (CSA)`;
+      } else if (trimmedName) {
+        finalName = trimmedName;
+      }
 
-      const finalName = (picked?.name ?? name).trim();
-      if (!finalName) throw new Error(`Please select a ${isDistributor ? "distributor" : "CSA"} or type the name`);
+      if (!finalName) throw new Error("Please select a CSA or type the distributor name");
 
       const { error } = await supabase.from("distributor_visits").insert({
         salesman_id: userId,
-        distributor_id: isDistributor && picked ? picked.id : null,
-        distributor_name: finalName + (!isDistributor && picked ? " (CSA)" : ""),
+        distributor_id: null,
+        distributor_name: finalName,
         phone: phone.trim() || null,
         address: address.trim() || null,
         notes: notes.trim() || null,
@@ -101,29 +103,15 @@ export function DistributorVisitDialog({
         </DialogHeader>
 
         <div className="space-y-4">
-          <div className="flex gap-1 p-1 bg-muted rounded-lg w-fit">
-            <button
-              onClick={() => { setVisitType("distributor"); setPartyId(""); }}
-              className={`px-4 py-1.5 text-xs font-medium rounded-md transition-colors ${visitType === "distributor" ? "bg-background shadow-sm text-foreground" : "text-muted-foreground hover:text-foreground"}`}
-            >
-              Distributor
-            </button>
-            <button
-              onClick={() => { setVisitType("csa"); setPartyId(""); }}
-              className={`px-4 py-1.5 text-xs font-medium rounded-md transition-colors ${visitType === "csa" ? "bg-background shadow-sm text-foreground" : "text-muted-foreground hover:text-foreground"}`}
-            >
-              CSA
-            </button>
-          </div>
-
           <div className="space-y-1.5">
-            <Label>{visitType === "distributor" ? "Distributor" : "CSA"}</Label>
+            <Label>CSA</Label>
             <Select value={partyId} onValueChange={setPartyId}>
               <SelectTrigger>
-                <SelectValue placeholder={visitType === "distributor" ? "Select mapped distributor" : "Select mapped CSA"} />
+                <SelectValue placeholder="Select mapped CSA" />
               </SelectTrigger>
               <SelectContent>
-                {(visitType === "distributor" ? distributors : csas).map((d) => (
+                <SelectItem value="none">None / Not a CSA</SelectItem>
+                {csas.map((d) => (
                   <SelectItem key={d.id} value={d.id}>
                     {d.name}{d.city ? ` — ${d.city}` : ""}
                   </SelectItem>
@@ -132,12 +120,10 @@ export function DistributorVisitDialog({
             </Select>
           </div>
 
-          {!partyId ? (
-            <div className="space-y-1.5">
-              <Label>{visitType === "distributor" ? "Distributor firm name" : "CSA firm name"}</Label>
-              <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Firm / party name" />
-            </div>
-          ) : null}
+          <div className="space-y-1.5">
+            <Label>Distributor firm name</Label>
+            <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Type distributor name manually" />
+          </div>
 
           <div className="space-y-1.5">
             <Label>Mobile number</Label>
