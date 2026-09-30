@@ -40,7 +40,7 @@ export function SalesmanStockReport() {
         csaIds.length
           ? supabase
               .from("csa_stock")
-              .select("physical_qty, products(name, sku), csa(name)")
+              .select("physical_qty, products(name, sku), csas(name)")
               .in("csa_id", csaIds)
           : Promise.resolve({ data: [] }),
       ]);
@@ -60,7 +60,7 @@ export function SalesmanStockReport() {
         rows.push({
           product: (row.products as { name?: string } | null)?.name ?? "Unknown",
           sku: (row.products as { sku?: string } | null)?.sku ?? "",
-          location: `${(row.csa as { name?: string } | null)?.name ?? "Unknown"} (CSA)`,
+          location: `${(row.csas as { name?: string } | null)?.name ?? "Unknown"} (CSA)`,
           qty: row.physical_qty,
         });
       }
