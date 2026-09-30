@@ -51,9 +51,13 @@ function OrderDetailPage() {
   const order = data?.order;
   const items = order?.order_items ?? [];
   const partyName =
-    (order?.retailers as { name?: string } | null)?.name ??
-    (order?.csas as { name?: string } | null)?.name ??
-    "—";
+    order?.kind === "secondary"
+      ? (order?.retailers as { name?: string } | null)?.name
+      : order?.kind === "primary"
+        ? (order?.distributors as { name?: string } | null)?.name
+        : order?.kind === "depot"
+          ? (order?.csas as { name?: string } | null)?.name
+          : "—";
 
   useEffect(() => {
     if (!order) return;
@@ -183,9 +187,9 @@ function OrderDetailPage() {
             <p className="text-[11px] uppercase text-muted-foreground">Party</p>
             <p className="font-medium">{partyName}</p>
             <p className="text-[11px] text-muted-foreground">
-              {((order.retailers ?? order.csas) as { city?: string } | null)?.city ?? ""}{" "}
-              {((order.retailers ?? order.csas) as { gstin?: string } | null)?.gstin
-                ? `• GSTIN ${((order.retailers ?? order.csas) as { gstin?: string } | null)?.gstin}`
+              {((order.retailers ?? order.distributors ?? order.csas) as { city?: string } | null)?.city ?? ""}{" "}
+              {((order.retailers ?? order.distributors ?? order.csas) as { gstin?: string } | null)?.gstin
+                ? `• GSTIN ${((order.retailers ?? order.distributors ?? order.csas) as { gstin?: string } | null)?.gstin}`
                 : ""}
             </p>
           </div>
