@@ -74,6 +74,13 @@ export function useMe() {
         supabase.from("user_roles").select("role").eq("user_id", userId!),
       ]);
       const list = (roles ?? []).map((r) => r.role as AppRole);
+      
+      if (list.length === 0) {
+        await supabase.auth.signOut();
+        window.location.href = "/auth";
+        throw new Error("Your account has been deactivated.");
+      }
+
       // Sales managers (manager / ASE / ASM / business manager) also work the
       // field, so they always get the Field Sales dashboard as an extra role.
       if (list.some((r) => MANAGER_ROLES.includes(r)) && !list.includes("salesman")) {

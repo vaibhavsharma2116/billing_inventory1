@@ -22,6 +22,7 @@ import {
 import { inr, compactInr } from "@/lib/sfa";
 import { removeEmployee } from "@/lib/admin-users.functions";
 import { downloadReportPdf, rs } from "@/lib/report-pdf";
+import { COMPANY_HOLIDAYS } from "@/lib/sfa";
 
 export const Route = createFileRoute("/_authenticated/hr")({
   head: () => ({
@@ -191,11 +192,12 @@ function HrPage() {
         supabase
           .from("leaves")
           .select("id, user_id, leave_type, from_date, to_date, status, reason, created_at")
+          .or(`status.eq.pending,to_date.gte.${from}`)
           .order("created_at", { ascending: false }),
         supabase
           .from("expenses")
           .select("id, user_id, expense_date, kind, distance_km, ta_amount, da_amount, bill_amount, total_amount, route, vendor, notes, status")
-          .gte("expense_date", from)
+          .or(`status.eq.pending,expense_date.gte.${from}`)
           .lte("expense_date", to)
           .order("expense_date", { ascending: false }),
         supabase.from("salary_structures").select("*").order("effective_from", { ascending: false }),
@@ -244,7 +246,7 @@ function HrPage() {
       Array.from(new Set((data?.details ?? []).map((d) => d.city?.trim()).filter((c): c is string => !!c))).sort(),
     [data?.details],
   );
-  const isSunday = (iso: string) => new Date(`${iso}T00:00:00`).getDay() === 0;
+  const isOffDay = (iso: string) => new Date(`${iso}T00:00:00`).getDay() === 0 || COMPANY_HOLIDAYS.includes(iso);
   const onApprovedLeave = (userId: string, iso: string) =>
     (data?.leaves ?? []).some(
       (l) => l.user_id === userId && l.status === "approved" && l.from_date <= iso && l.to_date >= iso,
@@ -263,7 +265,7 @@ function HrPage() {
             }
             return out;
           })();
-    return dates.filter((d) => !isSunday(d));
+    return dates.filter((d) => !isOffDay(d));
   }, [attMode, attDate, from, to]);
   const absentRows = useMemo(() => {
     const scopedProfiles = profiles.filter((p) => attCity === "all" || cityOf(p.id) === attCity);

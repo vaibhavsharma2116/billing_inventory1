@@ -8,7 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { inr } from "@/lib/sfa";
+import { inr, COMPANY_HOLIDAYS } from "@/lib/sfa";
 import { downloadReportPdf, rs } from "@/lib/report-pdf";
 
 const pad = (n: number) => String(n).padStart(2, "0");
@@ -34,7 +34,9 @@ function monthDays(month: string) {
   return days;
 }
 
-const isSunday = (iso: string) => new Date(`${iso}T00:00:00`).getDay() === 0;
+const isOffDay = (iso: string) => {
+  return new Date(`${iso}T00:00:00`).getDay() === 0 || COMPANY_HOLIDAYS.includes(iso);
+};
 
 const num = (v: unknown) => Number((v as number | null) ?? 0);
 
@@ -77,7 +79,7 @@ export function AutoPayroll() {
         supabase.from("profiles").select("id, full_name, employee_code").order("full_name"),
         supabase.from("user_roles").select("user_id, role"),
         supabase.from("attendance").select("user_id, work_date, punch_in").gte("work_date", from).lte("work_date", to),
-        supabase.from("leaves").select("user_id, from_date, to_date, status, leave_type").eq("status", "approved"),
+        supabase.from("leaves").select("user_id, from_date, to_date, status, leave_type").eq("status", "approved").gte("to_date", from),
         supabase
           .from("expenses")
           .select("user_id, total_amount, status, expense_date")
@@ -111,7 +113,7 @@ export function AutoPayroll() {
 
   // Salary month based on actual days; every Sunday is a paid weekly off.
   const workingDays = days.length;
-  const sundayCount = useMemo(() => processedDays.filter(isSunday).length, [processedDays]);
+  const offDayCount = useMemo(() => processedDays.filter(isOffDay).length, [processedDays]);
 
   const lines: PayrollLine[] = useMemo(() => {
     if (!data) return [];
@@ -142,7 +144,7 @@ export function AutoPayroll() {
       if (eligibleDays.length === 0) continue; // safety check
       
       const partMonth = eligibleDays.length < days.length;
-      const sundaySet = new Set(eligibleDays.filter(isSunday));
+      const offDaySet = new Set(eligibleDays.filter(isOffDay));
       const paidBase = eligibleDays.length;
 
       let presentCount = 0;
@@ -150,7 +152,7 @@ export function AutoPayroll() {
       let fullLeaveCount = 0;
       
       for (const d of eligibleDays) {
-        if (sundaySet.has(d)) continue;
+        if (offDaySet.has(d)) continue;
         
         const hasPunch = data.attendance.some(a => a.user_id === p.id && a.work_date === d && a.punch_in);
         const l = data.leaves.find(l => l.user_id === p.id && l.status === "approved" && d >= l.from_date && d <= l.to_date);
@@ -175,10 +177,10 @@ export function AutoPayroll() {
       }
 
       const presentDays = presentCount;
-      const paidLeaveDays = sundaySet.size + (payLeaves ? (fullLeaveCount + halfLeaveCount) : 0);
+      const paidLeaveDays = offDaySet.size + (payLeaves ? (fullLeaveCount + halfLeaveCount) : 0);
       const paidDays = Math.min(presentDays + paidLeaveDays, paidBase);
       const lopDays = Math.max(paidBase - paidDays, 0);
-      const absentDays = eligibleDays.length - sundaySet.size - presentCount - fullLeaveCount - halfLeaveCount;
+      const absentDays = eligibleDays.length - offDaySet.size - presentCount - fullLeaveCount - halfLeaveCount;
 
       const gross =
         num(s?.["basic"]) +
@@ -338,7 +340,7 @@ export function AutoPayroll() {
             className="w-44"
           />
         </div>
-        <p className="text-xs text-muted-foreground">All Sundays are paid weekly off ({sundayCount} this month)</p>
+        <p className="text-xs text-muted-foreground">All Sundays and Holidays are paid off ({offDayCount} this month)</p>
         <label className="flex items-center gap-2 text-sm">
           <Switch checked={payLeaves} onCheckedChange={setPayLeaves} />
           Approved leave = paid

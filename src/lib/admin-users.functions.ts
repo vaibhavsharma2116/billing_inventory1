@@ -150,8 +150,17 @@ export const deleteAppUser = createServerFn({ method: "POST" })
     await assertAdmin(context.supabase, context.userId);
     if (data.id === context.userId) throw new Error("You cannot delete your own admin account");
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const { error } = await supabaseAdmin.auth.admin.deleteUser(data.id);
-    if (error) throw new Error(error.message);
+    
+    // Admin Soft delete: remove user roles to revoke app access and prevent history loss
+    const { error: roleErr } = await supabaseAdmin.from("user_roles").delete().eq("user_id", data.id);
+    if (roleErr) throw new Error(roleErr.message);
+    
+    // Mark as inactive in employee details if they exist
+    await supabaseAdmin
+      .from("employee_details")
+      .update({ status: "inactive", exit_date: new Date().toISOString().slice(0, 10) } as never)
+      .eq("user_id", data.id);
+      
     return { ok: true };
   });
 
@@ -172,8 +181,18 @@ export const removeEmployee = createServerFn({ method: "POST" })
     });
     if (targetAdmin) throw new Error("Admin accounts cannot be removed from here");
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const { error } = await supabaseAdmin.auth.admin.deleteUser(data.id);
-    if (error) throw new Error(error.message);
+    
+    // Soft delete: remove user roles to revoke app access
+    const { error: roleErr } = await supabaseAdmin.from("user_roles").delete().eq("user_id", data.id);
+    if (roleErr) throw new Error(roleErr.message);
+    
+    // Mark as inactive in employee details
+    const { error: empErr } = await supabaseAdmin
+      .from("employee_details")
+      .update({ status: "inactive", exit_date: new Date().toISOString().slice(0, 10) } as never)
+      .eq("user_id", data.id);
+    if (empErr) console.warn("Failed to update employee details on remove:", empErr);
+    
     return { ok: true };
   });
 
