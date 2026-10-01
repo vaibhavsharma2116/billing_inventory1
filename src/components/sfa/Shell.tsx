@@ -2,7 +2,7 @@ import type { ReactNode, ComponentType } from "react";
 import { Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import type { LucideProps } from "lucide-react";
-import { Home, LogOut, Download } from "lucide-react";
+import { Home, LogOut, Download, Headset } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -129,6 +129,17 @@ export function Shell({
                 <Home className="size-4" />
                 <span className="hidden sm:inline">Home</span>
               </Link>
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="text-plum-foreground hover:bg-plum-foreground/10"
+              asChild
+            >
+              <a href="tel:+917412911516" title="Help & Support">
+                <Headset className="size-4" />
+                <span className="hidden sm:inline">Support</span>
+              </a>
             </Button>
             <Button
               variant="ghost"
