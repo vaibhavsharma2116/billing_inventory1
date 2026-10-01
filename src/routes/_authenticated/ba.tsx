@@ -18,6 +18,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { inr, exactInr } from "@/lib/sfa";
 import { downloadReportPdf } from "@/lib/report-pdf";
 import { getPosition, useLocationTracking } from "@/hooks/useLocationTracking";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 
 export const Route = createFileRoute("/_authenticated/ba")({
   head: () => ({
@@ -52,6 +53,9 @@ function BaPage() {
   const [inKind, setInKind] = useState<"purchase" | "opening">("purchase");
   const [saleSearch, setSaleSearch] = useState("");
   const [inSearch, setInSearch] = useState("");
+
+  const [showNilDialog, setShowNilDialog] = useState(false);
+  const [nilReason, setNilReason] = useState("");
 
   const { data } = useQuery({
     queryKey: ["ba-day", userId, retailerId],
@@ -141,9 +145,9 @@ function BaPage() {
 
 
   const attend = useMutation({
-    mutationFn: async (kind: "in" | "out") => {
-      if (kind === "out" && sales.length === 0) {
-        throw new Error("Please enter today's sales before check-out. Daily sales entry is mandatory.");
+    mutationFn: async ({ kind, note }: { kind: "in" | "out"; note?: string }) => {
+      if (kind === "out" && sales.length === 0 && !note) {
+        throw new Error("Please enter today's sales before check-out, or provide a zero-sale reason.");
       }
       let pos: GeolocationPosition;
       try {
@@ -163,19 +167,29 @@ function BaPage() {
       } else {
         const { error } = await supabase
           .from("attendance")
-          .update({ punch_out: new Date().toISOString(), ...coords })
+          .update({ punch_out: new Date().toISOString(), ...coords, checkout_note: note || null })
           .eq("user_id", userId!)
           .eq("work_date", today());
         if (error) throw error;
       }
       await supabase.from("location_pings").insert({ user_id: userId!, work_date: today(), ...coords });
     },
-    onSuccess: (_d, kind) => {
-      toast.success(kind === "in" ? "Checked in at store" : "Checked out — have a good day!");
+    onSuccess: (_d, args) => {
+      toast.success(args.kind === "in" ? "Checked in at store" : "Checked out — have a good day!");
+      setShowNilDialog(false);
+      setNilReason("");
       qc.invalidateQueries({ queryKey: ["ba-day"] });
     },
     onError: (e: Error) => toast.error(e.message),
   });
+
+  const handleCheckOut = () => {
+    if (checkedIn && sales.length === 0) {
+      setShowNilDialog(true);
+    } else {
+      attend.mutate({ kind: checkedIn ? "out" : "in" });
+    }
+  };
 
   const applyStock = async (productId: string, nextQty: number) => {
     const existing = stock.find((s) => s.product_id === productId);
@@ -299,7 +313,7 @@ function BaPage() {
             variant="secondary"
             className="flex-1"
             disabled={attend.isPending || !!data?.attendance?.punch_out}
-            onClick={() => attend.mutate(checkedIn ? "out" : "in")}
+            onClick={handleCheckOut}
           >
             {data?.attendance?.punch_out
               ? "Day closed"
@@ -309,7 +323,7 @@ function BaPage() {
           </Button>
         </div>
         {checkedIn && sales.length === 0 ? (
-          <p className="mt-2 text-xs opacity-90">Daily sales entry is mandatory before check-out.</p>
+          <p className="mt-2 text-xs opacity-90">0 sales today. You can still check out by providing a reason.</p>
         ) : null}
       </div>
 
@@ -554,6 +568,38 @@ function BaPage() {
         Sales entries reduce counter stock automatically; purchases and opening stock increase it.
       </div>
       <LeaveApply userId={userId} />
+      {/* Nil Sales Check-out Dialog */}
+      <Dialog open={showNilDialog} onOpenChange={setShowNilDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Zero Sales Check-Out</DialogTitle>
+            <DialogDescription>
+              You haven't recorded any sales today. Please provide a reason to close your day.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div className="space-y-2">
+              <Label>Reason (Required)</Label>
+              <Textarea
+                placeholder="E.g., Store was closed, No footfall..."
+                value={nilReason}
+                onChange={(e) => setNilReason(e.target.value)}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowNilDialog(false)}>
+              Cancel
+            </Button>
+            <Button
+              onClick={() => attend.mutate({ kind: "out", note: nilReason })}
+              disabled={!nilReason.trim() || attend.isPending}
+            >
+              Submit & Check Out
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </Shell>
   );
 }
