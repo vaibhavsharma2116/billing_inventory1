@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo, useState, useCallback } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Section } from "@/components/sfa/Shell";
@@ -8,7 +8,8 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { inr, COMPANY_HOLIDAYS } from "@/lib/sfa";
+import { inr } from "@/lib/sfa";
+import { useHolidays } from "@/hooks/useHolidays";
 import { downloadReportPdf, rs } from "@/lib/report-pdf";
 
 const pad = (n: number) => String(n).padStart(2, "0");
@@ -33,10 +34,6 @@ function monthDays(month: string) {
   for (let d = 1; d <= last; d++) days.push(`${y}-${pad(m!)}-${pad(d)}`);
   return days;
 }
-
-const isOffDay = (iso: string) => {
-  return new Date(`${iso}T00:00:00`).getDay() === 0 || COMPANY_HOLIDAYS.includes(iso);
-};
 
 const num = (v: unknown) => Number((v as number | null) ?? 0);
 
@@ -105,6 +102,12 @@ export function AutoPayroll() {
     },
   });
 
+  const { data: holidays = [] } = useHolidays();
+
+  const isOffDay = useCallback((iso: string) => {
+    return new Date(`${iso}T00:00:00`).getDay() === 0 || holidays.includes(iso);
+  }, [holidays]);
+
   // Ensure timezone offset is accounted for to get local YYYY-MM-DD
   const todayDate = new Date(new Date().getTime() - new Date().getTimezoneOffset() * 60000).toISOString().split("T")[0]!;
   const processedDays = useMemo(() => {
@@ -113,7 +116,7 @@ export function AutoPayroll() {
 
   // Salary month based on actual days; every Sunday is a paid weekly off.
   const workingDays = days.length;
-  const offDayCount = useMemo(() => processedDays.filter(isOffDay).length, [processedDays]);
+  const offDayCount = useMemo(() => processedDays.filter(isOffDay).length, [processedDays, isOffDay]);
 
   const lines: PayrollLine[] = useMemo(() => {
     if (!data) return [];

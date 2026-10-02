@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useCallback } from "react";
 import { createFileRoute, Navigate, useNavigate } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
@@ -22,7 +22,7 @@ import {
 import { inr, compactInr } from "@/lib/sfa";
 import { removeEmployee } from "@/lib/admin-users.functions";
 import { downloadReportPdf, rs } from "@/lib/report-pdf";
-import { COMPANY_HOLIDAYS } from "@/lib/sfa";
+import { useHolidays } from "@/hooks/useHolidays";
 
 export const Route = createFileRoute("/_authenticated/hr")({
   head: () => ({
@@ -246,7 +246,9 @@ function HrPage() {
       Array.from(new Set((data?.details ?? []).map((d) => d.city?.trim()).filter((c): c is string => !!c))).sort(),
     [data?.details],
   );
-  const isOffDay = (iso: string) => new Date(`${iso}T00:00:00`).getDay() === 0 || COMPANY_HOLIDAYS.includes(iso);
+
+  const { data: holidays = [] } = useHolidays();
+  const isOffDay = useCallback((iso: string) => new Date(`${iso}T00:00:00`).getDay() === 0 || holidays.includes(iso), [holidays]);
   const onApprovedLeave = (userId: string, iso: string) =>
     (data?.leaves ?? []).some(
       (l) => l.user_id === userId && l.status === "approved" && l.from_date <= iso && l.to_date >= iso,

@@ -65,4 +65,3 @@ export function incentiveFor(sales: number, target: number) {
   return { achievement, slab, amount: (sales * slab.pct) / 100 };
 }
 
-export const COMPANY_HOLIDAYS = ['2024-01-26', '2024-08-15', '2024-10-02', '2024-11-01', '2024-12-25', '2025-01-26', '2025-08-15', '2025-10-02', '2025-10-20', '2025-12-25', '2026-01-26', '2026-08-15', '2026-10-02', '2026-11-08', '2026-12-25'];

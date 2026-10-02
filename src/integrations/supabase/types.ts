@@ -62,6 +62,24 @@ export type Database = {
         }
         Relationships: []
       }
+      company_holidays: {
+        Row: {
+          date: string
+          id: string
+          name: string
+        }
+        Insert: {
+          date: string
+          id?: string
+          name: string
+        }
+        Update: {
+          date?: string
+          id?: string
+          name?: string
+        }
+        Relationships: []
+      }
       attendance: {
         Row: {
           checkout_note: string | null
