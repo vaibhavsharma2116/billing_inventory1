@@ -6,6 +6,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useMe, roleHome } from "@/hooks/useAuth";
 import { Shell, StatCard, Section } from "@/components/sfa/Shell";
 import { AutoPayroll } from "@/components/sfa/AutoPayroll";
+import { HolidayManager } from "@/components/sfa/HolidayManager";
 import { usePager } from "@/components/sfa/Pager";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -517,7 +518,12 @@ function HrPage() {
           <TabsTrigger value="expenses">Expenses{pendingExpenses.length ? ` (${pendingExpenses.length})` : ""}</TabsTrigger>
           <TabsTrigger value="payroll">Payroll</TabsTrigger>
           <TabsTrigger value="auto-salary">Auto Salary</TabsTrigger>
+          <TabsTrigger value="holidays">Holidays</TabsTrigger>
         </TabsList>
+
+        <TabsContent value="holidays">
+          <HolidayManager />
+        </TabsContent>
 
         <TabsContent value="employees">
           <Section
