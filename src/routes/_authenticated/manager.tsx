@@ -49,7 +49,7 @@ function ManagerDashboard() {
     enabled: !!me?.profile?.id,
     queryFn: async () => {
       const managerId = me!.profile!.id;
-      const [dist, csa, ret, ord, coll, vis, att, ba, prof, asg, dep] = await Promise.all([
+      const [dist, csa, ret, ord, coll, vis, att, ba, prof, asg, dep, lvs, hols] = await Promise.all([
         supabase.from("distributors").select("id, name, city, state, outstanding, csa_id"),
         supabase.from("csas").select("id, name, city, state, depot_id"),
         supabase.from("retailers").select("id, name, city, retailer_type, distributor_id, outstanding, credit_limit"),
@@ -74,6 +74,8 @@ function ManagerDashboard() {
         supabase.from("profiles").select("id, full_name, phone, designation, distributor_id, csa_id, depot_id, reports_to"),
         supabase.from("manager_assignments").select("manager_id, distributor_id, csa_id, member_id"),
         supabase.from("depots").select("id, name, city, state"),
+        supabase.from("leaves").select("user_id, from_date, to_date, status").eq("status", "approved").lte("from_date", to).gte("to_date", from),
+        supabase.from("company_holidays").select("holiday_date").gte("holiday_date", from).lte("holiday_date", to),
       ]);
 
 
@@ -150,6 +152,8 @@ function ManagerDashboard() {
         ),
         attendance: (att.data ?? []).filter((a) => memberIds.has(a.user_id)),
         baSales: (ba.data ?? []).filter((b) => memberIds.has(b.ba_id)),
+        leaves: (lvs.data ?? []).filter((l) => memberIds.has(l.user_id)),
+        holidays: hols.data ?? [],
         profiles,
       };
     },
@@ -236,6 +240,19 @@ function ManagerDashboard() {
       .reduce((a, b) => a + Number(b.amount ?? 0), 0);
     const v = visits.filter((x) => x.salesman_id === p.id);
     const present = (data?.attendance ?? []).filter((a) => a.user_id === p.id && a.punch_in).length;
+    
+    // Calculate leave days intersecting with [from, to]
+    let leaveDays = 0;
+    (data?.leaves ?? []).filter(l => l.user_id === p.id).forEach(l => {
+      const s = l.from_date! < from ? from : l.from_date!;
+      const e = l.to_date! > to ? to : l.to_date!;
+      if (s <= e) {
+        leaveDays += Math.floor((new Date(e).getTime() - new Date(s).getTime()) / (1000 * 60 * 60 * 24)) + 1;
+      }
+    });
+
+    const hols = (data?.holidays ?? []).length;
+
     const coll = (data?.collections ?? [])
       .filter((c) => c.salesman_id === p.id)
       .reduce((a, c) => a + Number(c.amount ?? 0), 0);
@@ -248,6 +265,9 @@ function ManagerDashboard() {
       productive: v.filter((x) => x.productive).length,
       collections: coll,
       presentDays: present,
+      leaveDays,
+      holidays: hols,
+
     };
   });
 
@@ -620,7 +640,7 @@ function ManagerDashboard() {
             <TabsContent value="team">
               <Section title="Salesman / BA performance">
                 <Table
-                  head={["Member", "Role", "Sales", "Visits", "Productive", "Collections", "Present days"]}
+                  head={["Member", "Role", "Sales", "Visits", "Productive", "Collections", "Present", "Leaves", "Holidays"]}
                   rows={teamRows.map((t) => [
                     t.name,
                     t.designation,
@@ -629,6 +649,8 @@ function ManagerDashboard() {
                     String(t.productive),
                     inr(t.collections),
                     String(t.presentDays),
+                    String(t.leaveDays),
+                    String(t.holidays),
                   ])}
                   detail={(i) => {
                     const t = teamRows[i]!;
@@ -641,7 +663,9 @@ function ManagerDashboard() {
                           ["Sales", inr(t.sales)],
                           ["Visits", `${t.productive}/${t.visits} productive`],
                           ["Collections", inr(t.collections)],
-                          ["Present days", String(t.presentDays)],
+                          ["Present", String(t.presentDays)],
+                          ["Leaves", String(t.leaveDays)],
+                          ["Holidays", String(t.holidays)],
                         ]}
                         head={["Order", "Retailer", "Status", "Value", "Date"]}
                         rows={rows}
