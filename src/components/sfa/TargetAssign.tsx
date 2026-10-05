@@ -115,7 +115,7 @@ export function TargetAssign({ team = [] }: { team?: { id: string; full_name: st
       </Button>
 
       <div className="mt-4 space-y-2">
-        {(rows ?? []).map((r) => (
+        {(rows ?? []).filter((r) => team.some((t) => t.id === r.user_id)).map((r) => (
           <div key={r.id} className="flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-border/60 p-3 text-sm">
             <p className="font-medium">{nameOf(r.user_id)}</p>
             <div className="flex flex-wrap gap-1">
@@ -126,7 +126,7 @@ export function TargetAssign({ team = [] }: { team?: { id: string; full_name: st
             </div>
           </div>
         ))}
-        {(rows ?? []).length === 0 ? (
+        {(rows ?? []).filter((r) => team.some((t) => t.id === r.user_id)).length === 0 ? (
           <p className="text-sm text-muted-foreground">Is month ke liye koi target assign nahi hua.</p>
         ) : null}
       </div>
