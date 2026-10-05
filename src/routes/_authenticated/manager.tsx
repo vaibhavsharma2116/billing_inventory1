@@ -467,7 +467,7 @@ function ManagerDashboard() {
           ) : null}
 
 
-          <TargetAssign />
+          <TargetAssign team={(data?.profiles ?? []).filter((p) => p.id !== me?.profile?.id)} />
 
           <Section title={`My reporting team (${reportingRows.length})`}>
             <p className="mb-2 text-xs text-muted-foreground">

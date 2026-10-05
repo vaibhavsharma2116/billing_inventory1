@@ -12,7 +12,7 @@ import { inr } from "@/lib/sfa";
 
 const monthKey = (d = new Date()) => d.toISOString().slice(0, 7);
 
-export function TargetAssign() {
+export function TargetAssign({ team = [] }: { team?: { id: string; full_name: string; designation?: string | null }[] }) {
   const qc = useQueryClient();
   const [month, setMonth] = useState(monthKey());
   const [userId, setUserId] = useState("");
@@ -21,18 +21,6 @@ export function TargetAssign() {
   const [visits, setVisits] = useState("");
 
   const periodMonth = `${month}-01`;
-
-  const { data: team } = useQuery({
-    queryKey: ["target-team"],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("profiles")
-        .select("id, full_name, designation")
-        .order("full_name");
-      if (error) throw new Error(error.message);
-      return data ?? [];
-    },
-  });
 
   const { data: rows } = useQuery({
     queryKey: ["targets", periodMonth],
