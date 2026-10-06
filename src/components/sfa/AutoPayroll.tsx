@@ -157,7 +157,7 @@ export function AutoPayroll() {
       for (const d of eligibleDays) {
         if (offDaySet.has(d)) continue;
         
-        const hasPunch = data.attendance.some(a => a.user_id === p.id && a.work_date === d && a.punch_in);
+        const hasPunch = data.attendance.some(a => a.user_id === p.id && a.work_date === d && a.punch_in && a.punch_out);
         const l = data.leaves.find(l => l.user_id === p.id && l.status === "approved" && d >= l.from_date && d <= l.to_date);
         const isHalf = l?.leave_type?.toLowerCase().includes("half");
         
