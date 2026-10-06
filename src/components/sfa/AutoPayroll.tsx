@@ -75,7 +75,7 @@ export function AutoPayroll() {
       const [profilesRaw, roles, attendance, leaves, expenses, salaries, details] = await Promise.all([
         supabase.from("profiles").select("id, full_name, employee_code").order("full_name"),
         supabase.from("user_roles").select("user_id, role"),
-        supabase.from("attendance").select("user_id, work_date, punch_in").gte("work_date", from).lte("work_date", to),
+        supabase.from("attendance").select("user_id, work_date, punch_in, punch_out").gte("work_date", from).lte("work_date", to),
         supabase.from("leaves").select("user_id, from_date, to_date, status, leave_type").eq("status", "approved").gte("to_date", from),
         supabase
           .from("expenses")
