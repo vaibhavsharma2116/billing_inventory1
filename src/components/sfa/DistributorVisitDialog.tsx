@@ -23,9 +23,15 @@ import {
 export function DistributorVisitDialog({
   invalidateKeys = ["salesman-day"],
   trigger,
+  initialName = "",
+  initialPhone = "",
+  initialAddress = "",
 }: {
   invalidateKeys?: string[] | undefined;
   trigger?: React.ReactNode | undefined;
+  initialName?: string;
+  initialPhone?: string;
+  initialAddress?: string;
 }) {
   const { data: me } = useMe();
   const qc = useQueryClient();
@@ -34,16 +40,16 @@ export function DistributorVisitDialog({
   const { data: csas = [] } = useMappedCsas(open);
 
   const [partyId, setPartyId] = useState<string>("none");
-  const [name, setName] = useState("");
-  const [phone, setPhone] = useState("");
-  const [address, setAddress] = useState("");
+  const [name, setName] = useState(initialName);
+  const [phone, setPhone] = useState(initialPhone);
+  const [address, setAddress] = useState(initialAddress);
   const [notes, setNotes] = useState("");
 
   const reset = () => {
     setPartyId("none");
-    setName("");
-    setPhone("");
-    setAddress("");
+    setName(initialName);
+    setPhone(initialPhone);
+    setAddress(initialAddress);
     setNotes("");
   };
 

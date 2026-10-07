@@ -47,7 +47,7 @@ function SalesmanPage() {
     queryFn: async () => {
       const start = today() + "T00:00:00Z";
       const monthStart = today().slice(0, 8) + "01";
-      const [attendance, visits, orders, collections, target, retailers, stock, monthOrders, monthVisits, distVisits, monthDistVisits] = await Promise.all([
+      const [attendance, visits, orders, collections, target, retailers, stock, monthOrders, monthVisits, distVisits, monthDistVisits, histDistVisits] = await Promise.all([
         supabase.from("attendance").select("*").eq("user_id", userId!).eq("work_date", today()).maybeSingle(),
         supabase.from("visits").select("id, retailer_id, productive, notes, checked_in_at, retailers(name)").eq("salesman_id", userId!).gte("checked_in_at", start).order("checked_in_at", { ascending: false }),
         supabase.from("orders").select("id, total_amount, status, order_no, retailer_id").eq("salesman_id", userId!).gte("created_at", start),
@@ -67,6 +67,12 @@ function SalesmanPage() {
           .gte("visited_at", start)
           .order("visited_at", { ascending: false }),
         supabase.from("distributor_visits").select("id").eq("salesman_id", userId!).gte("visited_at", `${monthStart}T00:00:00Z`),
+        supabase
+          .from("distributor_visits")
+          .select("distributor_name, phone, address, visited_at")
+          .eq("salesman_id", userId!)
+          .order("visited_at", { ascending: false })
+          .limit(300),
       ]);
       return {
         attendance: attendance.data,
@@ -79,6 +85,7 @@ function SalesmanPage() {
         monthSales: (monthOrders.data ?? []).reduce((s, o) => s + Number(o.total_amount), 0),
         distributorVisits: distVisits.data ?? [],
         monthVisits: (monthVisits.data ?? []).length + (monthDistVisits.data ?? []).length,
+        historicalDistVisits: histDistVisits.data ?? [],
       };
     },
   });
@@ -169,6 +176,21 @@ function SalesmanPage() {
 
   const greeting = new Date().getHours() < 12 ? "Good Morning" : new Date().getHours() < 17 ? "Good Afternoon" : "Good Evening";
 
+  const uniqueHistoricalDistributors = Object.values(
+    (data?.historicalDistVisits ?? []).reduce((acc: any, curr: any) => {
+      const name = curr.distributor_name ? curr.distributor_name.toLowerCase().trim() : "";
+      if (name) {
+        const phone = curr.phone ? curr.phone.trim() : "";
+        const address = curr.address ? curr.address.trim().toLowerCase() : "";
+        const key = `${name}|${phone}|${address}`;
+        if (!acc[key]) {
+          acc[key] = { ...curr, _uniqueKey: key };
+        }
+      }
+      return acc;
+    }, {})
+  ) as { distributor_name: string; phone: string | null; address: string | null; _uniqueKey: string }[];
+
   return (
     <Shell
       mobile
@@ -180,7 +202,6 @@ function SalesmanPage() {
         { to: "/expenses", label: "Expenses", icon: Receipt },
         { to: "/my-report", label: "Reports", icon: BarChart3 },
       ]}
-
     >
       <div
         role="button"
@@ -341,6 +362,33 @@ function SalesmanPage() {
           )}
         </div>
       </Section>
+
+      {uniqueHistoricalDistributors.length > 0 && (
+        <Section title="Recent Distributors">
+          <div className="divide-y divide-border/60">
+            {uniqueHistoricalDistributors.map((d) => (
+              <div key={d._uniqueKey} className="flex items-center justify-between gap-3 p-3 text-sm">
+                <div className="min-w-0">
+                  <p className="truncate font-medium">{d.distributor_name}</p>
+                  {d.phone ? <p className="text-[11px] text-muted-foreground">{d.phone}</p> : null}
+                  {d.address ? <p className="truncate text-[11px] text-muted-foreground">{d.address}</p> : null}
+                </div>
+                <DistributorVisitDialog
+                  invalidateKeys={["salesman-day"]}
+                  initialName={d.distributor_name}
+                  initialPhone={d.phone || ""}
+                  initialAddress={d.address || ""}
+                  trigger={
+                    <Button variant="outline" size="sm" className="shrink-0">
+                      Visit Again
+                    </Button>
+                  }
+                />
+              </div>
+            ))}
+          </div>
+        </Section>
+      )}
 
       <Section
         title="My Retailers"
