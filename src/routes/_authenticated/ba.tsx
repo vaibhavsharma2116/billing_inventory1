@@ -567,7 +567,7 @@ function BaPage() {
         <Boxes className="size-4 shrink-0 text-primary" />
         Sales entries reduce counter stock automatically; purchases and opening stock increase it.
       </div>
-      <LeaveApply userId={userId} />
+      <LeaveApply userId={userId} isBa={true} />
       {/* Nil Sales Check-out Dialog */}
       <Dialog open={showNilDialog} onOpenChange={setShowNilDialog}>
         <DialogContent>

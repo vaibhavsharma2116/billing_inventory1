@@ -27,7 +27,7 @@ const LEAVE_TYPES = [
 const day = (v: string | null | undefined) => (v ? new Date(v).toLocaleDateString("en-IN") : "—");
 
 /** Leave application card for field roles (salesman / BA). Approval sits with HR. */
-export function LeaveApply({ userId }: { userId?: string | undefined }) {
+export function LeaveApply({ userId, isBa = false }: { userId?: string | undefined, isBa?: boolean }) {
   const qc = useQueryClient();
   const [open, setOpen] = useState(false);
   const todayStr = new Date().toISOString().slice(0, 10);
@@ -75,6 +75,8 @@ export function LeaveApply({ userId }: { userId?: string | undefined }) {
     onError: (e: Error) => toast.error(e.message),
   });
 
+  const leaveOptions = isBa ? [...LEAVE_TYPES, { value: "weekly_off", label: "Weekly Off" }] : LEAVE_TYPES;
+
   return (
     <Section
       title="Leave"
@@ -101,7 +103,7 @@ export function LeaveApply({ userId }: { userId?: string | undefined }) {
             >
               <SelectTrigger><SelectValue /></SelectTrigger>
               <SelectContent>
-                {LEAVE_TYPES.map((t) => (
+                {leaveOptions.map((t) => (
                   <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>
                 ))}
               </SelectContent>
