@@ -73,13 +73,24 @@ function DistributorPage() {
         .order("created_at", { ascending: false });
       if (myDistributorId) purchaseInvQ = purchaseInvQ.eq("orders.distributor_id", myDistributorId);
 
+      let secOrdersQ = supabase
+        .from("orders")
+        .select("*, retailers(*), order_items(id, qty, free_qty, rate, amount, product_id, products(name, sku, hsn, mrp))")
+        .eq("kind", "secondary")
+        .order("created_at", { ascending: false });
+      if (myDistributorId) secOrdersQ = secOrdersQ.eq("distributor_id", myDistributorId);
+
+      let invoicesQ = supabase
+        .from("invoices")
+        .select(
+          "*, orders!inner(order_no, discount_amount, distributor_id, retailers(*), order_items(id, qty, free_qty, rate, amount, products(name, sku, hsn, mrp)))",
+        )
+        .order("created_at", { ascending: false });
+      if (myDistributorId) invoicesQ = invoicesQ.eq("orders.distributor_id", myDistributorId);
+
       const [orders, stock, invoices, distributors, purchases, purchaseInvoices, collections, products, retailers] =
         await Promise.all([
-        supabase
-          .from("orders")
-          .select("*, retailers(*), order_items(id, qty, free_qty, rate, amount, product_id, products(name, sku, hsn, mrp))")
-          .eq("kind", "secondary")
-          .order("created_at", { ascending: false }),
+        secOrdersQ,
         (myDistributorId
           ? supabase
               .from("distributor_stock")
@@ -90,12 +101,7 @@ function DistributorPage() {
               .from("distributor_stock")
               .select("*, products(name, sku, ptr)")
               .order("physical_qty", { ascending: true })),
-        supabase
-          .from("invoices")
-          .select(
-            "*, orders(order_no, discount_amount, distributor_id, retailers(*), order_items(id, qty, free_qty, rate, amount, products(name, sku, hsn, mrp)))",
-          )
-          .order("created_at", { ascending: false }),
+        invoicesQ,
         supabase.from("distributors").select("*"),
         purchaseQ,
         purchaseInvQ,
