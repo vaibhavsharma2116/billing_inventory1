@@ -2,7 +2,8 @@ import { useState } from "react";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { BarChart3, Boxes, CalendarDays, Download, MapPin, PackagePlus, ShoppingBag } from "lucide-react";
+import { BarChart3, Boxes, CalendarDays, Download, MapPin, PackagePlus, ShoppingBag, Check, ChevronsUpDown } from "lucide-react";
+import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
 import { useMe } from "@/hooks/useAuth";
 import { LeaveApply } from "@/components/sfa/LeaveApply";
@@ -18,6 +19,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { inr, exactInr } from "@/lib/sfa";
 import { downloadReportPdf } from "@/lib/report-pdf";
 import { getPosition, useLocationTracking } from "@/hooks/useLocationTracking";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 
 export const Route = createFileRoute("/_authenticated/ba")({
@@ -43,16 +46,16 @@ function BaPage() {
   const retailerId = (me?.profile as { retailer_id?: string | null } | undefined)?.retailer_id ?? null;
 
   const [saleProduct, setSaleProduct] = useState("");
+  const [saleProductOpen, setSaleProductOpen] = useState(false);
   const [saleQty, setSaleQty] = useState("1");
   const [saleRate, setSaleRate] = useState("");
   const [saleNote, setSaleNote] = useState("");
 
   const [inProduct, setInProduct] = useState("");
+  const [inProductOpen, setInProductOpen] = useState(false);
   const [inQty, setInQty] = useState("");
   const [inRef, setInRef] = useState("");
   const [inKind, setInKind] = useState<"purchase" | "opening">("purchase");
-  const [saleSearch, setSaleSearch] = useState("");
-  const [inSearch, setInSearch] = useState("");
 
   const [showNilDialog, setShowNilDialog] = useState(false);
   const [nilReason, setNilReason] = useState("");
@@ -359,40 +362,53 @@ function BaPage() {
           <div className="space-y-3 rounded-2xl border border-border bg-card p-4">
             <div className="space-y-1.5">
               <Label>Product</Label>
-              <Select
-                value={saleProduct}
-                onValueChange={(v) => {
-                  setSaleProduct(v);
-                  const p = products.find((x) => x.id === v);
-                  setSaleRate(String(p?.mrp ?? ""));
-                }}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select product" />
-                </SelectTrigger>
-                <SelectContent>
-                  <div className="p-2">
-                    <Input
-                      autoFocus
-                      value={saleSearch}
-                      onChange={(e) => setSaleSearch(e.target.value)}
-                      onKeyDown={(e) => e.stopPropagation()}
-                      placeholder="Search product…"
-                      className="h-9"
-                    />
-                  </div>
-                  {products
-                    .filter((p) => {
-                      const q = saleSearch.trim().toLowerCase();
-                      return !q || p.name.toLowerCase().includes(q) || (p.sku ?? "").toLowerCase().includes(q);
-                    })
-                    .map((p) => (
-                      <SelectItem key={p.id} value={p.id}>
-                        {p.name} · {qtyOf(p.id)} pcs
-                      </SelectItem>
-                    ))}
-                </SelectContent>
-              </Select>
+              <Popover open={saleProductOpen} onOpenChange={setSaleProductOpen}>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    role="combobox"
+                    aria-expanded={saleProductOpen}
+                    className="w-full justify-between font-normal"
+                  >
+                    {saleProduct
+                      ? products.find((p) => p.id === saleProduct)?.name
+                      : "Select product..."}
+                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-[calc(100vw-32px)] sm:w-[350px] p-0" align="start">
+                  <Command>
+                    <CommandInput placeholder="Search product..." />
+                    <CommandList>
+                      <CommandEmpty>No product found.</CommandEmpty>
+                      <CommandGroup>
+                        {products.map((p) => (
+                          <CommandItem
+                            key={p.id}
+                            value={p.id}
+                            onSelect={(currentValue) => {
+                              setSaleProduct(currentValue === saleProduct ? "" : currentValue);
+                              if (currentValue && currentValue !== saleProduct) {
+                                const prod = products.find((x) => x.id === currentValue);
+                                setSaleRate(String(prod?.mrp ?? ""));
+                              }
+                              setSaleProductOpen(false);
+                            }}
+                          >
+                            <Check
+                              className={cn(
+                                "mr-2 h-4 w-4",
+                                saleProduct === p.id ? "opacity-100" : "opacity-0"
+                              )}
+                            />
+                            {p.name} · {qtyOf(p.id)} pcs
+                          </CommandItem>
+                        ))}
+                      </CommandGroup>
+                    </CommandList>
+                  </Command>
+                </PopoverContent>
+              </Popover>
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div className="space-y-1.5">
@@ -451,33 +467,49 @@ function BaPage() {
             </div>
             <div className="space-y-1.5">
               <Label>Product</Label>
-              <Select value={inProduct} onValueChange={setInProduct}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select product" />
-                </SelectTrigger>
-                <SelectContent>
-                  <div className="p-2">
-                    <Input
-                      autoFocus
-                      value={inSearch}
-                      onChange={(e) => setInSearch(e.target.value)}
-                      onKeyDown={(e) => e.stopPropagation()}
-                      placeholder="Search product…"
-                      className="h-9"
-                    />
-                  </div>
-                  {products
-                    .filter((p) => {
-                      const q = inSearch.trim().toLowerCase();
-                      return !q || p.name.toLowerCase().includes(q) || (p.sku ?? "").toLowerCase().includes(q);
-                    })
-                    .map((p) => (
-                      <SelectItem key={p.id} value={p.id}>
-                        {p.name} · {qtyOf(p.id)} pcs
-                      </SelectItem>
-                    ))}
-                </SelectContent>
-              </Select>
+              <Popover open={inProductOpen} onOpenChange={setInProductOpen}>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    role="combobox"
+                    aria-expanded={inProductOpen}
+                    className="w-full justify-between font-normal"
+                  >
+                    {inProduct
+                      ? products.find((p) => p.id === inProduct)?.name
+                      : "Select product..."}
+                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-[calc(100vw-32px)] sm:w-[350px] p-0" align="start">
+                  <Command>
+                    <CommandInput placeholder="Search product..." />
+                    <CommandList>
+                      <CommandEmpty>No product found.</CommandEmpty>
+                      <CommandGroup>
+                        {products.map((p) => (
+                          <CommandItem
+                            key={p.id}
+                            value={p.id}
+                            onSelect={(currentValue) => {
+                              setInProduct(currentValue === inProduct ? "" : currentValue);
+                              setInProductOpen(false);
+                            }}
+                          >
+                            <Check
+                              className={cn(
+                                "mr-2 h-4 w-4",
+                                inProduct === p.id ? "opacity-100" : "opacity-0"
+                              )}
+                            />
+                            {p.name} · {qtyOf(p.id)} pcs
+                          </CommandItem>
+                        ))}
+                      </CommandGroup>
+                    </CommandList>
+                  </Command>
+                </PopoverContent>
+              </Popover>
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div className="space-y-1.5">
