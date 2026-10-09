@@ -17,8 +17,10 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { inr, exactInr } from "@/lib/sfa";
+import { downloadReportPdf } from "@/lib/report-pdf";
+import { getPosition, useLocationTracking } from "@/hooks/useLocationTracking";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList, CommandDialog } from "@/components/ui/command";
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 
 export const Route = createFileRoute("/_authenticated/ba")({
@@ -360,46 +362,53 @@ function BaPage() {
           <div className="space-y-3 rounded-2xl border border-border bg-card p-4">
             <div className="space-y-1.5">
               <Label>Product</Label>
-              <Button
-                variant="outline"
-                role="combobox"
-                aria-expanded={saleProductOpen}
-                className="w-full justify-between font-normal"
-                onClick={() => setSaleProductOpen(true)}
-              >
-                {saleProduct
-                  ? products.find((p) => p.id === saleProduct)?.name
-                  : "Select product..."}
-                <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-              </Button>
-
-              <CommandDialog open={saleProductOpen} onOpenChange={setSaleProductOpen}>
-                <CommandInput placeholder="Search product by name or SKU..." />
-                <CommandList>
-                  <CommandEmpty>No product found.</CommandEmpty>
-                  <CommandGroup>
-                    {products.map((p) => (
-                      <CommandItem
-                        key={p.id}
-                        value={p.id + " " + p.name + " " + (p.sku || "")}
-                        onSelect={() => {
-                          setSaleProduct(p.id);
-                          setSaleRate(String(p.mrp ?? ""));
-                          setSaleProductOpen(false);
-                        }}
-                      >
-                        <Check
-                          className={cn(
-                            "mr-2 h-4 w-4",
-                            saleProduct === p.id ? "opacity-100" : "opacity-0"
-                          )}
-                        />
-                        {p.name} · {qtyOf(p.id)} pcs
-                      </CommandItem>
-                    ))}
-                  </CommandGroup>
-                </CommandList>
-              </CommandDialog>
+              <Popover open={saleProductOpen} onOpenChange={setSaleProductOpen}>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    role="combobox"
+                    aria-expanded={saleProductOpen}
+                    className="w-full justify-between font-normal"
+                  >
+                    {saleProduct
+                      ? products.find((p) => p.id === saleProduct)?.name
+                      : "Select product..."}
+                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-[calc(100vw-32px)] sm:w-[350px] p-0" align="start">
+                  <Command>
+                    <CommandInput placeholder="Search product..." />
+                    <CommandList>
+                      <CommandEmpty>No product found.</CommandEmpty>
+                      <CommandGroup>
+                        {products.map((p) => (
+                          <CommandItem
+                            key={p.id}
+                            value={p.id}
+                            onSelect={(currentValue) => {
+                              setSaleProduct(currentValue === saleProduct ? "" : currentValue);
+                              if (currentValue && currentValue !== saleProduct) {
+                                const prod = products.find((x) => x.id === currentValue);
+                                setSaleRate(String(prod?.mrp ?? ""));
+                              }
+                              setSaleProductOpen(false);
+                            }}
+                          >
+                            <Check
+                              className={cn(
+                                "mr-2 h-4 w-4",
+                                saleProduct === p.id ? "opacity-100" : "opacity-0"
+                              )}
+                            />
+                            {p.name} · {qtyOf(p.id)} pcs
+                          </CommandItem>
+                        ))}
+                      </CommandGroup>
+                    </CommandList>
+                  </Command>
+                </PopoverContent>
+              </Popover>
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div className="space-y-1.5">
@@ -458,45 +467,49 @@ function BaPage() {
             </div>
             <div className="space-y-1.5">
               <Label>Product</Label>
-              <Button
-                variant="outline"
-                role="combobox"
-                aria-expanded={inProductOpen}
-                className="w-full justify-between font-normal"
-                onClick={() => setInProductOpen(true)}
-              >
-                {inProduct
-                  ? products.find((p) => p.id === inProduct)?.name
-                  : "Select product..."}
-                <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-              </Button>
-
-              <CommandDialog open={inProductOpen} onOpenChange={setInProductOpen}>
-                <CommandInput placeholder="Search product by name or SKU..." />
-                <CommandList>
-                  <CommandEmpty>No product found.</CommandEmpty>
-                  <CommandGroup>
-                    {products.map((p) => (
-                      <CommandItem
-                        key={p.id}
-                        value={p.id + " " + p.name + " " + (p.sku || "")}
-                        onSelect={() => {
-                          setInProduct(p.id);
-                          setInProductOpen(false);
-                        }}
-                      >
-                        <Check
-                          className={cn(
-                            "mr-2 h-4 w-4",
-                            inProduct === p.id ? "opacity-100" : "opacity-0"
-                          )}
-                        />
-                        {p.name} · {qtyOf(p.id)} pcs
-                      </CommandItem>
-                    ))}
-                  </CommandGroup>
-                </CommandList>
-              </CommandDialog>
+              <Popover open={inProductOpen} onOpenChange={setInProductOpen}>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    role="combobox"
+                    aria-expanded={inProductOpen}
+                    className="w-full justify-between font-normal"
+                  >
+                    {inProduct
+                      ? products.find((p) => p.id === inProduct)?.name
+                      : "Select product..."}
+                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-[calc(100vw-32px)] sm:w-[350px] p-0" align="start">
+                  <Command>
+                    <CommandInput placeholder="Search product..." />
+                    <CommandList>
+                      <CommandEmpty>No product found.</CommandEmpty>
+                      <CommandGroup>
+                        {products.map((p) => (
+                          <CommandItem
+                            key={p.id}
+                            value={p.id}
+                            onSelect={(currentValue) => {
+                              setInProduct(currentValue === inProduct ? "" : currentValue);
+                              setInProductOpen(false);
+                            }}
+                          >
+                            <Check
+                              className={cn(
+                                "mr-2 h-4 w-4",
+                                inProduct === p.id ? "opacity-100" : "opacity-0"
+                              )}
+                            />
+                            {p.name} · {qtyOf(p.id)} pcs
+                          </CommandItem>
+                        ))}
+                      </CommandGroup>
+                    </CommandList>
+                  </Command>
+                </PopoverContent>
+              </Popover>
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div className="space-y-1.5">
