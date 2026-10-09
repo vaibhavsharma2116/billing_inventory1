@@ -243,7 +243,6 @@ function BaPage() {
       setSaleQty("1");
       setSaleRate("");
       setSaleNote("");
-      setSaleSearch("");
       qc.invalidateQueries({ queryKey: ["ba-day"] });
     },
     onError: (e: Error) => toast.error(e.message),
@@ -272,7 +271,6 @@ function BaPage() {
       setInProduct("");
       setInQty("");
       setInRef("");
-      setInSearch("");
       qc.invalidateQueries({ queryKey: ["ba-day"] });
     },
     onError: (e: Error) => toast.error(e.message),
@@ -385,11 +383,12 @@ function BaPage() {
                         {products.map((p) => (
                           <CommandItem
                             key={p.id}
-                            value={p.id}
+                            value={`${p.id}:::${p.name}:::${p.sku || ""}`}
                             onSelect={(currentValue) => {
-                              setSaleProduct(currentValue === saleProduct ? "" : currentValue);
-                              if (currentValue && currentValue !== saleProduct) {
-                                const prod = products.find((x) => x.id === currentValue);
+                              const id = currentValue.split(":::")[0] || "";
+                              setSaleProduct(id === saleProduct ? "" : id);
+                              if (id && id !== saleProduct) {
+                                const prod = products.find((x) => x.id === id);
                                 setSaleRate(String(prod?.mrp ?? ""));
                               }
                               setSaleProductOpen(false);
@@ -490,9 +489,10 @@ function BaPage() {
                         {products.map((p) => (
                           <CommandItem
                             key={p.id}
-                            value={p.id}
+                            value={`${p.id}:::${p.name}:::${p.sku || ""}`}
                             onSelect={(currentValue) => {
-                              setInProduct(currentValue === inProduct ? "" : currentValue);
+                              const id = currentValue.split(":::")[0] || "";
+                              setInProduct(id === inProduct ? "" : id);
                               setInProductOpen(false);
                             }}
                           >
