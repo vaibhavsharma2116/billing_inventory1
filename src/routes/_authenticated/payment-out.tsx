@@ -17,10 +17,10 @@ const MODES = ["Cash", "UPI", "Cheque", "NEFT/RTGS"];
 export const Route = createFileRoute("/_authenticated/payment-out")({
   head: () => ({
     meta: [
-      { title: "Payment Out to CSA — POPPiK SFA" },
-      { name: "description", content: "Distributors pay their CSA and CSAs confirm the receipt to clear outstanding." },
-      { property: "og:title", content: "Payment Out to CSA — POPPiK SFA" },
-      { property: "og:description", content: "Record distributor payments to CSA with approval-based outstanding settlement." },
+      { title: "Payment Out — POPPiK SFA" },
+      { name: "description", content: "Record outgoing payments with approval-based settlement." },
+      { property: "og:title", content: "Payment Out — POPPiK SFA" },
+      { property: "og:description", content: "Record payments with approval-based outstanding settlement." },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary" },
     ],
@@ -39,13 +39,16 @@ function PaymentOutPage() {
 
   const [distributorId, setDistributorId] = useState("");
   const [csaId, setCsaId] = useState("");
+  const [depotId, setDepotId] = useState("");
   const [amount, setAmount] = useState("");
   const [mode, setMode] = useState("Cash");
   const [reference, setReference] = useState("");
   const [notes, setNotes] = useState("");
 
-  const { data } = useQuery({
-    queryKey: ["payment-out-parties"],
+  // Query parties for Distributor flow
+  const { data: distData } = useQuery({
+    queryKey: ["payment-out-dist-parties"],
+    enabled: !isCsa,
     queryFn: async () => {
       const [distributors, csas] = await Promise.all([
         supabase.from("distributors").select("id, name, city, outstanding, csa_id").order("name"),
@@ -55,124 +58,224 @@ function PaymentOutPage() {
     },
   });
 
+  // Query parties for CSA flow (Depots and CSA profile)
+  const { data: csaData } = useQuery({
+    queryKey: ["payment-out-csa-parties", myCsaId],
+    enabled: isCsa,
+    queryFn: async () => {
+      const [depots, csaInfo, invoices, collections] = await Promise.all([
+        supabase.from("depots").select("id, name, city, state").order("name"),
+        myCsaId
+          ? supabase.from("csas").select("id, name, city, depot_id, depots(id, name, city)").eq("id", myCsaId).maybeSingle()
+          : Promise.resolve({ data: null }),
+        myCsaId
+          ? supabase
+              .from("invoices")
+              .select("net_amount, orders!inner(csa_id, kind)")
+              .eq("orders.csa_id", myCsaId)
+              .eq("orders.kind", "depot")
+          : Promise.resolve({ data: [] }),
+        myCsaId
+          ? (supabase
+              .from("collections")
+              .select("amount")
+              .eq("csa_id" as any, myCsaId)
+              .eq("status", "approved") as any)
+          : Promise.resolve({ data: [] }),
+      ]);
+
+      const totalBilled = (invoices.data ?? []).reduce((s: number, i: any) => s + Number(i.net_amount || 0), 0);
+      const totalPaid = ((collections.data as any[]) ?? []).reduce((s: number, c: any) => s + Number(c.amount || 0), 0);
+      const balance = Math.max(0, totalBilled - totalPaid);
+
+      return {
+        depots: depots.data ?? [],
+        csa: csaInfo.data ?? null,
+        balance,
+        totalBilled,
+        totalPaid,
+      };
+    },
+  });
+
   useEffect(() => {
-    if (!data) return;
     if (isCsa) {
       if (myCsaId) setCsaId(myCsaId);
-    } else if (myDistributorId) {
-      setDistributorId(myDistributorId);
-      const d = data.distributors.find((x) => x.id === myDistributorId);
-      if (d?.csa_id) setCsaId(d.csa_id);
+      if (csaData?.csa?.depot_id) {
+        setDepotId(csaData.csa.depot_id);
+      } else if (csaData?.depots && csaData.depots.length > 0 && !depotId && csaData.depots[0]) {
+        setDepotId(csaData.depots[0].id);
+      }
+    } else if (distData) {
+      if (myDistributorId) {
+        setDistributorId(myDistributorId);
+        const d = distData.distributors.find((x) => x.id === myDistributorId);
+        if (d?.csa_id) setCsaId(d.csa_id);
+      }
     }
-  }, [data, isCsa, myCsaId, myDistributorId]);
+  }, [csaData, distData, isCsa, myCsaId, myDistributorId, depotId]);
 
-  const selectedDistributor = (data?.distributors ?? []).find((d) => d.id === distributorId) ?? null;
+  const selectedDistributor = (distData?.distributors ?? []).find((d) => d.id === distributorId) ?? null;
+  const selectedDepot = (csaData?.depots ?? []).find((d) => d.id === depotId) ?? null;
 
   const save = useMutation({
     mutationFn: async () => {
       const amt = Number(amount);
-      if (!distributorId) throw new Error("Please select a distributor");
-      if (!csaId) throw new Error("Please select a CSA");
       if (!amt || amt <= 0) throw new Error("Please enter a valid amount");
 
       const { data: auth } = await supabase.auth.getUser();
       const uid = auth.user?.id;
       if (!uid) throw new Error("Please sign in again");
 
-      const { data: inserted, error } = await supabase
-        .from("csa_payments")
-        .insert({
-          distributor_id: distributorId,
-          csa_id: csaId,
+      if (isCsa) {
+        // CSA paying Master Depot -> save into collections with csa_id and status 'pending'
+        const targetCsa = myCsaId || csaId;
+        if (!targetCsa) throw new Error("CSA profile not found. Please log in again.");
+
+        const { error } = await supabase.from("collections").insert({
+          csa_id: targetCsa,
+          salesman_id: uid,
           amount: amt,
           mode,
           reference: reference.trim() || null,
-          notes: notes.trim() || null,
-          created_by: uid,
-          created_role: isCsa ? "csa" : "distributor",
-        })
-        .select("id")
-        .single();
-      if (error) throw error;
+          status: "pending",
+        } as any);
 
-      // CSA-entered payments are self-approved immediately.
-      if (isCsa && inserted) {
-        const { error: rpcError } = await supabase.rpc("review_csa_payment", {
-          _id: inserted.id,
-          _approve: true,
-          _note: "Entered by CSA",
-        });
-        if (rpcError) throw rpcError;
+        if (error) throw error;
+        return { isCsa: true, amt };
+      } else {
+        // Distributor paying CSA -> save into csa_payments
+        if (!distributorId) throw new Error("Please select a distributor");
+        if (!csaId) throw new Error("Please select a CSA");
+
+        const { error } = await supabase
+          .from("csa_payments")
+          .insert({
+            distributor_id: distributorId,
+            csa_id: csaId,
+            amount: amt,
+            mode,
+            reference: reference.trim() || null,
+            notes: notes.trim() || null,
+            created_by: uid,
+            created_role: "distributor",
+          });
+        if (error) throw error;
+        return { isCsa: false, amt };
       }
-      return isCsa;
     },
-    onSuccess: (selfApproved) => {
-      toast.success(selfApproved ? "Payment recorded and outstanding updated" : "Payment sent to CSA for approval");
-      qc.invalidateQueries();
-      navigate({ to: isCsa ? "/csa" : "/distributor" });
+    onSuccess: ({ isCsa, amt }) => {
+      if (isCsa) {
+        toast.success(`Payment of ${inr(amt)} sent to Master Depot for approval`);
+        qc.invalidateQueries({ queryKey: ["csa-outgoing-payments"] });
+        qc.invalidateQueries({ queryKey: ["csa-panel"] });
+        qc.invalidateQueries({ queryKey: ["payment-out-csa-parties"] });
+        navigate({ to: "/csa" });
+      } else {
+        toast.success("Payment sent to CSA for approval");
+        qc.invalidateQueries({ queryKey: ["payment-out-dist-parties"] });
+        qc.invalidateQueries({ queryKey: ["distributor-panel"] });
+        navigate({ to: "/distributor" });
+      }
     },
     onError: (e: Error) => toast.error(e.message),
   });
 
   return (
     <Shell
-      title={isCsa ? "Payment In from Distributor" : "Payment Out to CSA"}
+      title={isCsa ? "Payment Out to Master Depot" : "Payment Out to CSA"}
       subtitle={
         isCsa
-          ? "Manually record a payment received from a distributor. Outstanding updates instantly."
+          ? "Record payment sent to Master Depot (Company). Ledger and balance will adjust once Depot approves."
           : "Send a payment entry to your CSA. Outstanding reduces once the CSA approves it."
       }
     >
       <Section title="Payment details">
         <div className="grid gap-4 p-4 md:grid-cols-2">
+          {isCsa ? (
+            <>
+              <div>
+                <Label>Master Depot / Company</Label>
+                {csaData?.csa?.depots?.name ? (
+                  <Input value={`${csaData.csa.depots.name}${csaData.csa.depots.city ? ` • ${csaData.csa.depots.city}` : ""}`} readOnly />
+                ) : (
+                  <Select value={depotId} onValueChange={setDepotId}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select Master Depot" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {(csaData?.depots ?? []).map((d) => (
+                        <SelectItem key={d.id} value={d.id}>
+                          {d.name} {d.city ? `• ${d.city}` : ""}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                )}
+                {csaData ? (
+                  <p className="mt-1 text-[11px] text-muted-foreground">
+                    Current balance payable: <span className="font-semibold text-foreground">{inr(csaData.balance)}</span>
+                  </p>
+                ) : null}
+              </div>
+
+              <div>
+                <Label>CSA / Super Stockist (Self)</Label>
+                <Input value={csaData?.csa?.name ?? me?.profile?.full_name ?? "CSA"} readOnly />
+              </div>
+            </>
+          ) : (
+            <>
+              <div>
+                <Label>Distributor</Label>
+                {myDistributorId ? (
+                  <Input value={selectedDistributor?.name ?? ""} readOnly />
+                ) : (
+                  <Select value={distributorId} onValueChange={setDistributorId}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select distributor" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {(distData?.distributors ?? []).map((d) => (
+                        <SelectItem key={d.id} value={d.id}>
+                          {d.name} {d.city ? `• ${d.city}` : ""}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                )}
+                {selectedDistributor ? (
+                  <p className="mt-1 text-[11px] text-muted-foreground">
+                    Outstanding {inr(selectedDistributor.outstanding)}
+                  </p>
+                ) : null}
+              </div>
+
+              <div>
+                <Label>CSA / Super Stockist</Label>
+                <Select value={csaId} onValueChange={setCsaId}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select CSA" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {(distData?.csas ?? []).map((c) => (
+                      <SelectItem key={c.id} value={c.id}>
+                        {c.name} {c.city ? `• ${c.city}` : ""}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </>
+          )}
+
           <div>
-            <Label>Distributor</Label>
-            {!isCsa && myDistributorId ? (
-              <Input value={selectedDistributor?.name ?? ""} readOnly />
-            ) : (
-              <Select value={distributorId} onValueChange={setDistributorId}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select distributor" />
-                </SelectTrigger>
-                <SelectContent>
-                  {(data?.distributors ?? []).map((d) => (
-                    <SelectItem key={d.id} value={d.id}>
-                      {d.name} {d.city ? `• ${d.city}` : ""}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            )}
-            {selectedDistributor ? (
-              <p className="mt-1 text-[11px] text-muted-foreground">
-                Outstanding {inr(selectedDistributor.outstanding)}
-              </p>
-            ) : null}
+            <Label htmlFor="amount">Amount (₹)</Label>
+            <Input id="amount" type="number" min={1} placeholder="Enter amount" value={amount} onChange={(e) => setAmount(e.target.value)} />
           </div>
 
           <div>
-            <Label>CSA / Super Stockist</Label>
-            <Select value={csaId} onValueChange={setCsaId} disabled={isCsa && !!myCsaId}>
-              <SelectTrigger>
-                <SelectValue placeholder="Select CSA" />
-              </SelectTrigger>
-              <SelectContent>
-                {(data?.csas ?? []).map((c) => (
-                  <SelectItem key={c.id} value={c.id}>
-                    {c.name} {c.city ? `• ${c.city}` : ""}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-
-          <div>
-            <Label htmlFor="amount">Amount</Label>
-            <Input id="amount" type="number" min={1} value={amount} onChange={(e) => setAmount(e.target.value)} />
-          </div>
-
-          <div>
-            <Label>Mode</Label>
+            <Label>Payment Mode</Label>
             <Select value={mode} onValueChange={setMode}>
               <SelectTrigger>
                 <SelectValue />
@@ -189,17 +292,17 @@ function PaymentOutPage() {
 
           <div>
             <Label htmlFor="reference">Reference / UTR / Cheque no.</Label>
-            <Input id="reference" value={reference} onChange={(e) => setReference(e.target.value)} />
+            <Input id="reference" placeholder="e.g. UTR12345678" value={reference} onChange={(e) => setReference(e.target.value)} />
           </div>
 
           <div className="md:col-span-2">
             <Label htmlFor="notes">Remark (optional)</Label>
-            <Textarea id="notes" rows={2} value={notes} onChange={(e) => setNotes(e.target.value)} />
+            <Textarea id="notes" rows={2} placeholder="Optional payment note" value={notes} onChange={(e) => setNotes(e.target.value)} />
           </div>
 
           <div className="flex gap-2 md:col-span-2">
             <Button onClick={() => save.mutate()} disabled={save.isPending}>
-              {save.isPending ? "Saving…" : isCsa ? "Record payment" : "Send for CSA approval"}
+              {save.isPending ? "Sending…" : isCsa ? "Send for Depot approval" : "Send for CSA approval"}
             </Button>
             <Button variant="outline" onClick={() => navigate({ to: isCsa ? "/csa" : "/distributor" })}>
               Cancel

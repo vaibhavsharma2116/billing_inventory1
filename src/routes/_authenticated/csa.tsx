@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Download, Search } from "lucide-react";
+import { Download, IndianRupee, Search } from "lucide-react";
 import { DeliveryList } from "@/components/sfa/DeliveryList";
 import { compactInr, gstBreakup, inr } from "@/lib/sfa";
 import { downloadInvoicePdf } from "@/lib/invoice-pdf";
@@ -38,7 +38,6 @@ function CsaPage() {
   const { data: me } = useMe();
   const myCsaId = (me?.profile?.csa_id as string | null) ?? null;
 
-
   const { data: payments } = useQuery({
     queryKey: ["csa-payments"],
     queryFn: async () => {
@@ -49,6 +48,20 @@ function CsaPage() {
         .limit(100);
       return data ?? [];
     },
+  });
+
+  const { data: outgoingPayments } = useQuery({
+    queryKey: ["csa-outgoing-payments", myCsaId],
+    queryFn: async () => {
+      if (!myCsaId) return [];
+      const { data } = await (supabase
+        .from("collections")
+        .select("*")
+        .eq("csa_id" as any, myCsaId)
+        .order("created_at", { ascending: false }) as any);
+      return (data ?? []) as any[];
+    },
+    enabled: !!myCsaId,
   });
 
   const reviewPayment = useMutation({
@@ -69,6 +82,7 @@ function CsaPage() {
   });
 
   const pendingPayments = (payments ?? []).filter((p) => p.status === "pending");
+  const pendingOutgoing = (outgoingPayments ?? []).filter((p) => p.status === "pending");
 
   const { data } = useQuery({
     queryKey: ["csa-panel", myCsaId],
@@ -147,6 +161,15 @@ function CsaPage() {
     });
   })();
 
+  const totalDepotBilled = (data?.purchaseInvoices ?? []).reduce((s, i) => s + Number(i.net_amount), 0);
+  const totalApprovedPaid = (outgoingPayments ?? [])
+    .filter((p) => p.status === "approved")
+    .reduce((s, p) => s + Number(p.amount), 0);
+  const totalPendingPaid = (outgoingPayments ?? [])
+    .filter((p) => p.status === "pending")
+    .reduce((s, p) => s + Number(p.amount), 0);
+  const netDepotPayable = Math.max(0, totalDepotBilled - totalApprovedPaid);
+
   return (
     <Shell title="CSA / Super Stockist" subtitle="Distributor orders • stock • dispatch">
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 md:grid-cols-4">
@@ -170,7 +193,9 @@ function CsaPage() {
           <TabsTrigger value="paymentin">
             Payment In{pendingPayments.length ? ` (${pendingPayments.length})` : ""}
           </TabsTrigger>
-          <TabsTrigger value="paymentout">Payment Out</TabsTrigger>
+          <TabsTrigger value="paymentout">
+            Payment Out{pendingOutgoing.length ? ` (${pendingOutgoing.length})` : ""}
+          </TabsTrigger>
           <TabsTrigger value="ledger">Party Ledger</TabsTrigger>
           <TabsTrigger value="margin">Margin Budget</TabsTrigger>
         </TabsList>
@@ -377,6 +402,7 @@ function CsaPage() {
                                 "Super Stockist",
                               ),
                               buyer: toParty(ord?.distributors, "Distributor", "Distributor"),
+                              shipTo: toParty(ord?.distributors, "Distributor (Consignee)", "Distributor"),
                               orderNo: ord?.order_no ?? null,
                               lines: (ord?.order_items ?? []).map((it) => ({
                                 name: it.products?.name ?? "Item",
@@ -440,6 +466,11 @@ function CsaPage() {
                               buyer: toParty(
                                 (data?.csas ?? []).find((c) => c.id === ord?.csa_id),
                                 "CSA / Super Stockist",
+                                "Super Stockist",
+                              ),
+                              shipTo: toParty(
+                                (data?.csas ?? []).find((c) => c.id === ord?.csa_id),
+                                "CSA (Consignee)",
                                 "Super Stockist",
                               ),
                               orderNo: ord?.order_no ?? null,
@@ -538,17 +569,91 @@ function CsaPage() {
           </Section>
         </TabsContent>
 
-        <TabsContent value="paymentout">
-          <Section title="Payment Out — bills payable to Master Depot">
+        <TabsContent value="paymentout" className="space-y-4">
+          <Section
+            title="Payment Out — to Master Depot (Company)"
+            action={
+              <Button asChild size="sm">
+                <Link to="/payment-out">
+                  <IndianRupee className="mr-1 size-3.5" /> Record Payment Out
+                </Link>
+              </Button>
+            }
+          >
+            <div className="grid grid-cols-2 gap-2 border-b bg-muted/20 p-3 sm:grid-cols-4">
+              <div className="rounded border bg-background p-2.5">
+                <p className="text-[11px] text-muted-foreground">Total Invoiced (Depot)</p>
+                <p className="text-sm font-semibold tabular-nums">{inr(totalDepotBilled)}</p>
+              </div>
+              <div className="rounded border bg-background p-2.5">
+                <p className="text-[11px] text-muted-foreground">Paid & Approved</p>
+                <p className="text-sm font-semibold tabular-nums text-success">{inr(totalApprovedPaid)}</p>
+              </div>
+              <div className="rounded border bg-background p-2.5">
+                <p className="text-[11px] text-muted-foreground">Pending Approval</p>
+                <p className="text-sm font-semibold tabular-nums text-amber-600">{inr(totalPendingPaid)}</p>
+              </div>
+              <div className="rounded border bg-background p-2.5">
+                <p className="text-[11px] text-muted-foreground">Net Balance Payable</p>
+                <p className="text-sm font-semibold tabular-nums text-destructive">{inr(netDepotPayable)}</p>
+              </div>
+            </div>
+
+            <div className="bg-muted/40 p-3 text-xs font-medium uppercase tracking-wider text-muted-foreground">
+              Payments Sent to Master Depot
+            </div>
+            <div className="divide-y divide-border/60">
+              {(outgoingPayments ?? []).length === 0 ? (
+                <p className="p-4 text-sm text-muted-foreground">
+                  No outgoing payments recorded yet. Click &quot;Record Payment Out&quot; above to submit a payment to Master Depot.
+                </p>
+              ) : (
+                (outgoingPayments ?? []).map((p) => (
+                  <div key={p.id} className="flex items-center justify-between gap-3 p-3 text-sm">
+                    <div className="min-w-0">
+                      <p className="truncate font-medium">
+                        {p.mode} • {inr(p.amount)}
+                      </p>
+                      <p className="text-[11px] text-muted-foreground">
+                        {new Date(p.created_at).toLocaleDateString("en-IN")}
+                        {p.reference ? ` • Ref: ${p.reference}` : ""}
+                        {p.review_note ? ` • Note: ${p.review_note}` : ""}
+                      </p>
+                    </div>
+                    <div className="flex shrink-0 items-center gap-2">
+                      <span className="font-semibold tabular-nums">{inr(p.amount)}</span>
+                      <Badge
+                        variant={
+                          p.status === "approved"
+                            ? "default"
+                            : p.status === "rejected"
+                            ? "destructive"
+                            : "secondary"
+                        }
+                      >
+                        {p.status === "pending"
+                          ? "Pending Depot"
+                          : p.status === "approved"
+                          ? "Approved"
+                          : "Rejected"}
+                      </Badge>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          </Section>
+
+          <Section title="Bills Payable to Master Depot">
             <div className="divide-y divide-border/60">
               {(data?.purchaseInvoices ?? []).length === 0 ? (
                 <p className="p-4 text-sm text-muted-foreground">No depot purchase bills yet.</p>
               ) : (
                 <>
                   <div className="flex items-center justify-between gap-3 bg-muted/40 p-3 text-sm">
-                    <span className="font-medium">Total payable</span>
+                    <span className="font-medium">Total Invoiced Amount</span>
                     <span className="font-semibold tabular-nums">
-                      {inr((data?.purchaseInvoices ?? []).reduce((s, i) => s + Number(i.net_amount), 0))}
+                      {inr(totalDepotBilled)}
                     </span>
                   </div>
                   {(data?.purchaseInvoices ?? []).map((i) => {

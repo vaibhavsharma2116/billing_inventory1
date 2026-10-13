@@ -16,6 +16,7 @@ import { compactInr, inr } from "@/lib/sfa";
 import { downloadInvoicePdf } from "@/lib/invoice-pdf";
 import { toParty } from "@/lib/invoice-party";
 import { DeliveryList } from "@/components/sfa/DeliveryList";
+import { reviewCollectionServerFn } from "@/lib/collection-review.functions";
 
 export const Route = createFileRoute("/_authenticated/depot")({
   head: () => ({
@@ -41,6 +42,7 @@ function DepotPage() {
   const [stockSearch, setStockSearch] = useState("");
   const [ledgerSearch, setLedgerSearch] = useState("");
   const [orderSearch, setOrderSearch] = useState("");
+  const [payNote, setPayNote] = useState<Record<string, string>>({});
 
 
 
@@ -79,9 +81,47 @@ function DepotPage() {
         }),
         payouts: payouts.data ?? [],
       };
-
     },
   });
+
+  const { data: csaCollections } = useQuery({
+    queryKey: ["depot-csa-collections", myDepotId],
+    queryFn: async () => {
+      const { data } = await (supabase
+        .from("collections")
+        .select("*, csas(id, name, city, depot_id)")
+        .not("csa_id" as any, "is", null)
+        .order("created_at", { ascending: false }) as any);
+      const rows = (data ?? []) as any[];
+      if (!myDepotId) return rows;
+      return rows.filter((r) => {
+        const c = r.csas as { depot_id?: string | null } | null;
+        return !c?.depot_id || c.depot_id === myDepotId;
+      });
+    },
+  });
+
+  const reviewCollection = useMutation({
+    mutationFn: async ({ id, approve }: { id: string; approve: boolean }) => {
+      const noteVal = payNote[id]?.trim();
+      await reviewCollectionServerFn({
+        data: {
+          id,
+          approve,
+          note: noteVal ? noteVal : undefined,
+        },
+      });
+    },
+    onSuccess: (_d, v) => {
+      toast.success(v.approve ? "Payment approved and CSA ledger updated" : "Payment rejected");
+      qc.invalidateQueries({ queryKey: ["depot-csa-collections"] });
+      qc.invalidateQueries({ queryKey: ["depot-panel"] });
+      qc.invalidateQueries({ queryKey: ["parties"] });
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const pendingCsaCollections = (csaCollections ?? []).filter((c: any) => c.status === "pending");
 
   const orders = data?.orders ?? [];
   const filteredOrders = orders.filter((o) => {
@@ -105,15 +145,21 @@ function DepotPage() {
   });
 
   const csaLedger = (data?.csas ?? []).map((c) => {
-
     const rows = (data?.invoices ?? []).filter(
       (i) => ((i.orders as { csas: { id?: string } | null } | null)?.csas as { id?: string } | null)?.id === c.id,
     );
+    const billed = rows.reduce((s, i) => s + Number(i.net_amount), 0);
+    const received = (csaCollections ?? [])
+      .filter((col: any) => col.csa_id === c.id && col.status === "approved")
+      .reduce((s: number, col: any) => s + Number(col.amount), 0);
+    const balance = Math.max(0, billed - received);
     return {
       id: c.id,
       name: c.name,
       area: c.city ?? "—",
-      billed: rows.reduce((s, i) => s + Number(i.net_amount), 0),
+      billed,
+      received,
+      balance,
       bills: rows.length,
       billRows: rows.map((i) => ({
         id: i.id,
@@ -126,6 +172,7 @@ function DepotPage() {
   }).filter((c) => !ledgerSearch || c.name.toLowerCase().includes(ledgerSearch.trim().toLowerCase()));
   const payouts = data?.payouts ?? [];
   const payoutTotal = payouts.reduce((s, e) => s + Number(e.total_amount ?? 0), 0);
+
 
 
 
@@ -192,7 +239,9 @@ function DepotPage() {
           <TabsTrigger value="stock">Depot Stock</TabsTrigger>
           <TabsTrigger value="invoices">Sales Invoices</TabsTrigger>
           <TabsTrigger value="delivery">Delivery Status</TabsTrigger>
-          <TabsTrigger value="paymentin">Payment In</TabsTrigger>
+          <TabsTrigger value="paymentin">
+            Payment In{pendingCsaCollections.length ? ` (${pendingCsaCollections.length})` : ""}
+          </TabsTrigger>
           <TabsTrigger value="paymentout">Payment Out</TabsTrigger>
           <TabsTrigger value="ledger">Party Ledger</TabsTrigger>
         </TabsList>
@@ -243,15 +292,82 @@ function DepotPage() {
           />
         </TabsContent>
 
-        <TabsContent value="paymentin">
+        <TabsContent value="paymentin" className="space-y-4">
           <Section 
-            title="Payment In — bills receivable from CSAs"
+            title={`Payments from Super Stockists (CSAs)${pendingCsaCollections.length ? ` (${pendingCsaCollections.length} pending)` : ""}`}
             action={
               <Button asChild size="sm">
                 <Link to="/payment-in" search={{ partyId: "" }}>Manual Payment In</Link>
               </Button>
             }
           >
+            <div className="divide-y divide-border/60">
+              {(csaCollections ?? []).length === 0 ? (
+                <p className="p-4 text-sm text-muted-foreground">No payments received from CSAs yet.</p>
+              ) : (
+                (csaCollections ?? []).map((p) => {
+                  const csaName = (p.csas as { name?: string; city?: string } | null)?.name ?? "Super Stockist";
+                  return (
+                    <div key={p.id} className="space-y-2 p-3 text-sm">
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0">
+                          <p className="truncate font-medium">{csaName}</p>
+                          <p className="text-[11px] text-muted-foreground">
+                            {new Date(p.created_at).toLocaleDateString("en-IN")} • {p.mode}
+                            {p.reference ? ` • Ref: ${p.reference}` : ""}
+                          </p>
+                          {p.review_note ? (
+                            <p className="text-[11px] text-muted-foreground">Note: {p.review_note}</p>
+                          ) : null}
+                        </div>
+                        <div className="text-right">
+                          <p className="font-semibold tabular-nums text-success">{inr(p.amount)}</p>
+                          <Badge
+                            variant={
+                              p.status === "approved"
+                                ? "default"
+                                : p.status === "rejected"
+                                ? "destructive"
+                                : "secondary"
+                            }
+                          >
+                            {p.status}
+                          </Badge>
+                        </div>
+                      </div>
+                      {p.status === "pending" ? (
+                        <div className="flex flex-wrap items-center gap-2 pt-1">
+                          <Input
+                            className="h-8 max-w-xs"
+                            placeholder="Approval note (optional)"
+                            value={payNote[p.id] ?? ""}
+                            onChange={(e) => setPayNote((n) => ({ ...n, [p.id]: e.target.value }))}
+                          />
+                          <Button
+                            size="sm"
+                            disabled={reviewCollection.isPending}
+                            onClick={() => reviewCollection.mutate({ id: p.id, approve: true })}
+                          >
+                            Approve
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            disabled={reviewCollection.isPending}
+                            onClick={() => reviewCollection.mutate({ id: p.id, approve: false })}
+                          >
+                            Reject
+                          </Button>
+                        </div>
+                      ) : null}
+                    </div>
+                  );
+                })
+              )}
+            </div>
+          </Section>
+
+          <Section title="Bills Receivable from CSAs">
             <div className="divide-y divide-border/60">
               {(data?.invoices ?? []).length === 0 ? (
                 <p className="p-4 text-sm text-muted-foreground">No CSA bills yet.</p>
@@ -348,10 +464,10 @@ function DepotPage() {
                       <div className="min-w-0">
                         <p className="truncate font-medium">{p.name}</p>
                         <p className="text-[11px] text-muted-foreground">
-                          {p.area} • Billed {inr(p.billed)} • {p.bills} bill(s)
+                          {p.area} • Billed {inr(p.billed)} • Received {inr(p.received)} • {p.bills} bill(s)
                         </p>
                       </div>
-                      <span className="shrink-0 font-semibold tabular-nums">{inr(p.billed)}</span>
+                      <span className="shrink-0 font-semibold tabular-nums text-foreground">{inr(p.balance)}</span>
                     </button>
                     {openCsa === p.id ? (
                       <div className="bg-muted/30 px-3 pb-3">
@@ -503,6 +619,7 @@ function DepotPage() {
                                 "Master Depot",
                               ),
                               buyer: toParty(ord?.csas, "CSA / Super Stockist", "CSA"),
+                              shipTo: toParty(ord?.csas, "CSA (Consignee)", "CSA"),
                               orderNo: ord?.order_no ?? null,
                               lines: (ord?.order_items ?? []).map((it) => ({
                                 name: it.products?.name ?? "Item",

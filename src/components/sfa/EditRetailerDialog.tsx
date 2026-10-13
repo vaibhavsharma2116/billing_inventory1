@@ -24,6 +24,7 @@ type Form = {
   owner_name: string;
   phone: string;
   address: string;
+  shipping_address: string;
   city: string;
   area: string;
   state: string;
@@ -39,6 +40,7 @@ const empty: Form = {
   owner_name: "",
   phone: "",
   address: "",
+  shipping_address: "",
   city: "",
   area: "",
   state: "",
@@ -77,9 +79,7 @@ export function EditRetailerDialog({
     enabled: open,
     queryFn: async () => {
       const { data, error } = await (supabase.from("retailers") as any)
-        .select(
-          "id, name, owner_name, phone, address, city, area, state, pincode, gstin, email, margin_pct, display_amount, retailer_type, distributor_id",
-        )
+        .select("*")
         .eq("id", retailerId)
         .maybeSingle();
       if (error) throw error;
@@ -89,12 +89,13 @@ export function EditRetailerDialog({
 
   useEffect(() => {
     if (!retailer) return;
-    const r = retailer as typeof retailer & { area?: string | null; pincode?: string | null };
+    const r = retailer as typeof retailer & { area?: string | null; pincode?: string | null; shipping_address?: string | null };
     setForm({
       name: r.name ?? "",
       owner_name: r.owner_name ?? "",
       phone: r.phone ?? "",
       address: r.address ?? "",
+      shipping_address: r.shipping_address ?? "",
       city: r.city ?? "",
       area: r.area ?? "",
       state: r.state ?? "",
@@ -121,6 +122,7 @@ export function EditRetailerDialog({
           owner_name: form.owner_name.trim() || null,
           phone: form.phone.trim() || null,
           address: form.address.trim() || null,
+          shipping_address: form.shipping_address.trim() || null,
           city: form.city.trim() || null,
           area: form.area.trim() || null,
           state: form.state.trim() || null,
@@ -178,8 +180,12 @@ export function EditRetailerDialog({
               </div>
             </div>
             <div className="grid gap-1.5">
-              <Label htmlFor="e-address">Address</Label>
-              <Input id="e-address" value={form.address} onChange={set("address")} />
+              <Label htmlFor="e-address">Billing Address</Label>
+              <Input id="e-address" value={form.address} onChange={set("address")} placeholder="Shop / Billing address" />
+            </div>
+            <div className="grid gap-1.5">
+              <Label htmlFor="e-ship-address">Shipping Address (Optional)</Label>
+              <Input id="e-ship-address" value={form.shipping_address} onChange={set("shipping_address")} placeholder="Delivery / Godown address (blank chhodne par billing address use hoga)" />
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div className="grid gap-1.5">

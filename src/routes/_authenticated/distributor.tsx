@@ -736,6 +736,7 @@ function DistributorPage() {
                                 "Distributor",
                               ),
                               buyer: toParty(ord?.retailers, "Retailer / Outlet", "Retailer"),
+                              shipTo: toParty(ord?.retailers, "Retailer / Delivery Address", "Retailer"),
                               orderNo: ord?.order_no ?? null,
 
                               lines: (ord?.order_items ?? []).map((it) => ({
@@ -798,7 +799,7 @@ function DistributorPage() {
                                 title: "PURCHASE BILL",
                                 seller: toParty(o.csas as Record<string, string | null> | null, "CSA / Super Stockist", "Super Stockist"),
                                 buyer: toParty(dist, "Distributor (Purchaser)", "Distributor"),
-
+                                shipTo: toParty(dist, "Distributor (Consignee)", "Distributor"),
                                 orderNo: o.order_no,
                                 lines: (o.order_items ?? []).map((it) => ({
                                   name: (it.products as { name: string } | null)?.name ?? "Item",
@@ -870,7 +871,11 @@ function DistributorPage() {
                                 "Distributor (Purchaser)",
                                 "Distributor",
                               ),
-
+                              shipTo: toParty(
+                                (data?.distributors ?? []).find((d) => d.id === ord?.distributor_id),
+                                "Distributor (Consignee)",
+                                "Distributor",
+                              ),
                               orderNo: ord?.order_no ?? null,
                               lines: (ord?.order_items ?? []).map((it) => ({
                                 name: it.products?.name ?? "Item",

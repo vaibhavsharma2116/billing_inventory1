@@ -24,6 +24,7 @@ type Form = {
   owner_name: string;
   phone: string;
   address: string;
+  shipping_address: string;
   city: string;
   area: string;
   gstin: string;
@@ -34,7 +35,7 @@ type Form = {
   display_amount: string;
 };
 
-const empty: Form = { name: "", owner_name: "", phone: "", address: "", city: "", area: "", gstin: "", state: "", pincode: "", email: "", margin_pct: "", display_amount: "" };
+const empty: Form = { name: "", owner_name: "", phone: "", address: "", shipping_address: "", city: "", area: "", gstin: "", state: "", pincode: "", email: "", margin_pct: "", display_amount: "" };
 
 const RETAILER_TYPES = [
   { value: "ba", label: "BA (Beauty Advisor)" },
@@ -69,6 +70,7 @@ export function AddRetailerDialog({ invalidateKeys = [] }: { invalidateKeys?: st
         owner_name: form.owner_name.trim() || null,
         phone: form.phone.trim() || null,
         address: form.address.trim() || null,
+        shipping_address: form.shipping_address.trim() || null,
         city: form.city.trim() || null,
         area: form.area.trim() || null,
         gstin: form.gstin.trim() || null,
@@ -123,8 +125,12 @@ export function AddRetailerDialog({ invalidateKeys = [] }: { invalidateKeys?: st
             </div>
           </div>
           <div className="grid gap-1.5">
-            <Label htmlFor="r-address">Address</Label>
-            <Input id="r-address" value={form.address} onChange={set("address")} />
+            <Label htmlFor="r-address">Billing Address</Label>
+            <Input id="r-address" value={form.address} onChange={set("address")} placeholder="Shop / Billing address" />
+          </div>
+          <div className="grid gap-1.5">
+            <Label htmlFor="r-ship-address">Shipping Address (Optional)</Label>
+            <Input id="r-ship-address" value={form.shipping_address} onChange={set("shipping_address")} placeholder="Delivery / Godown address (blank chhodne par billing address use hoga)" />
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div className="grid gap-1.5">

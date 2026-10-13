@@ -15,6 +15,7 @@ export type InvoiceParty = {
   role?: string | null;
   name: string;
   address?: string | null;
+  shipping_address?: string | null;
   city?: string | null;
   state?: string | null;
   gstin?: string | null;
@@ -28,6 +29,7 @@ export type InvoicePdfData = {
   date?: string | null;
   seller: InvoiceParty;
   buyer: InvoiceParty;
+  shipTo?: InvoiceParty | null;
   orderNo?: string | null;
   discountAmount?: number | undefined;
   lines: InvoicePdfLine[];
@@ -39,14 +41,39 @@ export type InvoicePdfData = {
 
 const money = (n: number) => inr(n).replace("₹", "Rs. ");
 
-function partyLines(p: InvoiceParty): string[] {
+function sellerLines(p: InvoiceParty): string[] {
+  const out: string[] = [p.name];
+  if (p.address) out.push(p.address);
+  const loc = [p.city, p.state].filter(Boolean).join(", ");
+  if (loc) out.push(loc);
+  const extras = [
+    p.gstin ? `GSTIN: ${p.gstin}` : null,
+    p.phone ? `Mobile: ${p.phone}` : null,
+    p.email ? `Email: ${p.email}` : null,
+  ].filter(Boolean).join("  •  ");
+  if (extras) out.push(extras);
+  return out;
+}
+
+function billToLines(p: InvoiceParty): string[] {
   const out: string[] = [p.name];
   if (p.address) out.push(p.address);
   const loc = [p.city, p.state].filter(Boolean).join(", ");
   if (loc) out.push(loc);
   out.push(`GSTIN: ${p.gstin || "Not provided"}`);
-  out.push(`Mobile: ${p.phone || "Not provided"}`);
-  out.push(`Email: ${p.email || "Not provided"}`);
+  if (p.phone) out.push(`Mobile: ${p.phone}`);
+  if (p.email) out.push(`Email: ${p.email}`);
+  return out;
+}
+
+function shipToLines(p: InvoiceParty): string[] {
+  const out: string[] = [p.name];
+  const deliveryAddr = p.shipping_address || p.address;
+  if (deliveryAddr) out.push(deliveryAddr);
+  const loc = [p.city, p.state].filter(Boolean).join(", ");
+  if (loc) out.push(loc);
+  if (p.gstin) out.push(`GSTIN: ${p.gstin}`);
+  if (p.phone) out.push(`Delivery Contact: ${p.phone}`);
   return out;
 }
 
@@ -78,25 +105,46 @@ export async function downloadInvoicePdf(data: InvoicePdfData) {
   y += 13;
   if (data.date) doc.text(`Date: ${new Date(data.date).toLocaleDateString("en-IN")}`, W - 40, y, { align: "right" });
 
-  y += 18;
+  y += 16;
   doc.setDrawColor(200);
   doc.line(40, y, W - 40, y);
-  y += 16;
+  y += 13;
 
+  // Seller Section
   const colL = 40;
   const colR = W / 2 + 10;
-  const colW = W / 2 - 60;
+  const colW = W / 2 - 50;
+
   doc.setFont("helvetica", "bold");
-  doc.text(data.seller.role ? `Seller — ${data.seller.role}` : "Seller", colL, y);
-  doc.text(data.buyer.role ? `Bill To — ${data.buyer.role}` : "Bill To", colR, y);
+  doc.setFontSize(9);
+  doc.text(data.seller.role ? `Seller (Supplier) — ${data.seller.role}` : "Seller (Supplier)", colL, y);
+  doc.setFont("helvetica", "normal");
+  y += 12;
+
+  const sLines = sellerLines(data.seller).flatMap((t) => doc.splitTextToSize(t, W - 80) as string[]);
+  sLines.forEach((t) => {
+    doc.text(t, colL, y);
+    y += 11;
+  });
+
+  y += 4;
+  doc.line(40, y, W - 40, y);
+  y += 13;
+
+  // Bill To (Left) & Ship To (Right)
+  const shipParty = data.shipTo || data.buyer;
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(9);
+  doc.text(data.buyer.role ? `Bill To (Buyer) — ${data.buyer.role}` : "Bill To (Buyer)", colL, y);
+  doc.text("Ship To (Consignee / Delivery)", colR, y);
   doc.setFont("helvetica", "normal");
 
-  const left = partyLines(data.seller).flatMap((t) => doc.splitTextToSize(t, colW) as string[]);
-  const right = partyLines(data.buyer).flatMap((t) => doc.splitTextToSize(t, colW) as string[]);
-  const top = y + 14;
-  left.forEach((t, i) => doc.text(t, colL, top + i * 12));
-  right.forEach((t, i) => doc.text(t, colR, top + i * 12));
-  y = top + Math.max(left.length, right.length) * 12 + 10;
+  const bLines = billToLines(data.buyer).flatMap((t) => doc.splitTextToSize(t, colW) as string[]);
+  const shLines = shipToLines(shipParty).flatMap((t) => doc.splitTextToSize(t, colW) as string[]);
+  const partyTop = y + 13;
+  bLines.forEach((t, i) => doc.text(t, colL, partyTop + i * 11));
+  shLines.forEach((t, i) => doc.text(t, colR, partyTop + i * 11));
+  y = partyTop + Math.max(bLines.length, shLines.length) * 11 + 8;
 
   doc.line(40, y, W - 40, y);
   y += 18;

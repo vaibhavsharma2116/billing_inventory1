@@ -33,6 +33,7 @@ type Party = {
   email: string | null;
   gstin: string | null;
   address: string | null;
+  shipping_address?: string | null;
   city: string | null;
   state: string | null;
   csa_id?: string | null;
@@ -45,6 +46,7 @@ const empty = {
   email: "",
   gstin: "",
   address: "",
+  shipping_address: "",
   city: "",
   state: "",
   parentId: "",
@@ -59,15 +61,15 @@ export function PartyManager() {
       const [d, c, dep] = await Promise.all([
         supabase
           .from("distributors")
-          .select("id, name, phone, email, gstin, address, city, state, csa_id, outstanding")
+          .select("*")
           .order("name"),
         supabase
           .from("csas")
-          .select("id, name, phone, email, gstin, address, city, state, depot_id")
+          .select("*")
           .order("name"),
         supabase
           .from("depots")
-          .select("id, name, phone, email, gstin, address, city, state")
+          .select("*")
           .order("name"),
       ]);
       return {
@@ -159,6 +161,7 @@ function PartyBlock({
         email: form.email.trim() || null,
         gstin: form.gstin.trim() || null,
         address: form.address.trim() || null,
+        shipping_address: form.shipping_address.trim() || null,
         city: form.city.trim() || null,
         state: form.state.trim() || null,
       };
@@ -210,6 +213,7 @@ function PartyBlock({
       email: r.email ?? "",
       gstin: r.gstin ?? "",
       address: r.address ?? "",
+      shipping_address: (r as any).shipping_address ?? "",
       city: r.city ?? "",
       state: r.state ?? "",
       parentId: (kind === "csa" ? r.depot_id : r.csa_id) ?? "",
@@ -224,7 +228,8 @@ function PartyBlock({
           <Field label="Mobile no" value={form.phone} onChange={(v) => set("phone", v)} />
           <Field label="Email id" type="email" value={form.email} onChange={(v) => set("email", v)} />
           <Field label="GST no" value={form.gstin} onChange={(v) => set("gstin", v)} />
-          <Field label="Full address" value={form.address} onChange={(v) => set("address", v)} />
+          <Field label="Billing address" value={form.address} onChange={(v) => set("address", v)} />
+          <Field label="Shipping address (Godown / Delivery)" value={form.shipping_address} onChange={(v) => set("shipping_address", v)} placeholder="Blank chhodne par billing address use hoga" />
           <Field label="City" value={form.city} onChange={(v) => set("city", v)} />
           <Field label="State" value={form.state} onChange={(v) => set("state", v)} />
           {parentLabel ? (
@@ -312,16 +317,18 @@ function Field({
   value,
   onChange,
   type = "text",
+  placeholder,
 }: {
   label: string;
   value: string;
   onChange: (v: string) => void;
   type?: string;
+  placeholder?: string;
 }) {
   return (
     <div className="space-y-1.5">
       <Label>{label}</Label>
-      <Input type={type} value={value} onChange={(e) => onChange(e.target.value)} />
+      <Input type={type} value={value} onChange={(e) => onChange(e.target.value)} placeholder={placeholder} />
     </div>
   );
 }

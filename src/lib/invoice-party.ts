@@ -3,6 +3,7 @@ import type { InvoiceParty } from "@/lib/invoice-pdf";
 type PartyRow = {
   name?: string | null;
   address?: string | null;
+  shipping_address?: string | null;
   city?: string | null;
   state?: string | null;
   gstin?: string | null;
@@ -15,6 +16,7 @@ export function toParty(row: PartyRow, role: string, fallbackName = "Not provide
     role,
     name: row?.name || fallbackName,
     address: row?.address ?? null,
+    shipping_address: row?.shipping_address ?? null,
     city: row?.city ?? null,
     state: row?.state ?? null,
     gstin: row?.gstin ?? null,

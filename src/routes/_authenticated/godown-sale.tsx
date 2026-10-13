@@ -352,6 +352,7 @@ function NewPartyDialog({
     gstin: "",
     email: "",
     address: "",
+    shipping_address: "",
     city: "",
     state: "",
     margin_pct: "",
@@ -369,6 +370,7 @@ function NewPartyDialog({
         email: form.email.trim() || null,
         gstin: form.gstin.trim() || null,
         address: form.address.trim() || null,
+        shipping_address: form.shipping_address.trim() || null,
         city: form.city.trim() || null,
         state: form.state.trim() || null,
       };
@@ -376,7 +378,7 @@ function NewPartyDialog({
         const newId = crypto.randomUUID();
         const { error } = await supabase
           .from("csas")
-          .insert({ id: newId, ...base, depot_id: ownerId });
+          .insert({ id: newId, ...base, depot_id: ownerId } as any);
         if (error) throw error;
         return newId;
       }
@@ -384,21 +386,21 @@ function NewPartyDialog({
         const newId = crypto.randomUUID();
         const { error } = await supabase
           .from("distributors")
-          .insert({ id: newId, ...base, csa_id: ownerId });
+          .insert({ id: newId, ...base, csa_id: ownerId } as any);
         if (error) throw error;
         return newId;
       }
       const newId = crypto.randomUUID();
       const { error } = await supabase
         .from("retailers")
-        .insert({ id: newId, ...base, margin_pct: Number(form.margin_pct) || 0, distributor_id: ownerId, retailer_type: "no_ba", created_by: userId ?? null });
+        .insert({ id: newId, ...base, margin_pct: Number(form.margin_pct) || 0, distributor_id: ownerId, retailer_type: "no_ba", created_by: userId ?? null } as any);
       if (error) throw error;
       return newId;
     },
     onSuccess: async (id) => {
       toast.success("Party created");
       setOpen(false);
-      setForm({ name: "", phone: "", gstin: "", email: "", address: "", city: "", state: "", margin_pct: "" });
+      setForm({ name: "", phone: "", gstin: "", email: "", address: "", shipping_address: "", city: "", state: "", margin_pct: "" });
       await onCreated(id);
     },
     onError: (e: Error) => toast.error(e.message),
@@ -433,8 +435,12 @@ function NewPartyDialog({
             <Input type="email" value={form.email} onChange={set("email")} />
           </div>
           <div className="grid gap-1.5">
-            <Label>Full address</Label>
-            <Input value={form.address} onChange={set("address")} />
+            <Label>Billing address</Label>
+            <Input value={form.address} onChange={set("address")} placeholder="Shop / Billing address" />
+          </div>
+          <div className="grid gap-1.5">
+            <Label>Shipping address (Optional)</Label>
+            <Input value={form.shipping_address} onChange={set("shipping_address")} placeholder="Delivery / Godown address (blank chhodne par billing address use hoga)" />
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div className="grid gap-1.5">
