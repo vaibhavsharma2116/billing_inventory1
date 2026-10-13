@@ -226,15 +226,17 @@ function GodownSalePage() {
           <div className="grid gap-1.5">
             <div className="flex items-center justify-between gap-2">
               <Label>{partyLabel}</Label>
-              <NewPartyDialog
-                level={level}
-                ownerId={ownerId}
-                label={partyLabel}
-                onCreated={async (id) => {
-                  await qc.invalidateQueries({ queryKey: ["godown-sale-master"] });
-                  setPartyId(id);
-                }}
-              />
+              {level === "distributor" ? (
+                <NewPartyDialog
+                  level={level}
+                  ownerId={ownerId}
+                  label={partyLabel}
+                  onCreated={async (id) => {
+                    await qc.invalidateQueries({ queryKey: ["godown-sale-master"] });
+                    setPartyId(id);
+                  }}
+                />
+              ) : null}
             </div>
             <Select value={partyId} onValueChange={setPartyId}>
               <SelectTrigger>
