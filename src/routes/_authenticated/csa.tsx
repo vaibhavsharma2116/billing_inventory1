@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Download, IndianRupee, Search } from "lucide-react";
+import { Download, Inbox, IndianRupee, Search, Truck } from "lucide-react";
 import { DeliveryList } from "@/components/sfa/DeliveryList";
 import { compactInr, gstBreakup, inr } from "@/lib/sfa";
 import { downloadInvoicePdf } from "@/lib/invoice-pdf";
@@ -503,7 +503,8 @@ function CsaPage() {
           <Tabs defaultValue="incoming">
             <TabsList className="grid w-full grid-cols-2 sm:w-auto">
               <TabsTrigger value="incoming" className="gap-1.5 text-xs sm:text-sm">
-                <span>📥 डिपो से आने वाला माल</span>
+                <Inbox className="size-4" />
+                <span>Incoming from Depot</span>
                 {inTransitDepotOrders.length > 0 && (
                   <Badge variant="default" className="ml-1 h-5 px-1.5 text-[10px]">
                     {inTransitDepotOrders.length}
@@ -511,7 +512,8 @@ function CsaPage() {
                 )}
               </TabsTrigger>
               <TabsTrigger value="outgoing" className="gap-1.5 text-xs sm:text-sm">
-                <span>📤 डिस्ट्रीब्यूटर को भेजा माल</span>
+                <Truck className="size-4" />
+                <span>Dispatches to Distributors</span>
               </TabsTrigger>
             </TabsList>
 
