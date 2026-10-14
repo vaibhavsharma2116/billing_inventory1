@@ -7,11 +7,13 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { inr } from "@/lib/sfa";
+import { receiveDeliveryServerFn } from "@/lib/delivery-receive.functions";
 
 type Props = {
-  /** "csa" shows all deliveries read-only, "distributor" can accept/reject */
-  mode: "csa" | "distributor";
+  /** "csa" shows dispatches to distributors, "csa-incoming" shows deliveries from depot, "distributor" shows incoming */
+  mode: "csa" | "distributor" | "csa-incoming" | "depot";
   distributorId?: string | null;
+  csaId?: string | null;
   action?: React.ReactNode;
 };
 
@@ -27,19 +29,33 @@ const LABEL: Record<string, string> = {
   rejected: "Rejected",
 };
 
-export function DeliveryList({ mode, distributorId, action }: Props) {
+export function DeliveryList({ mode, distributorId, csaId, action }: Props) {
   const qc = useQueryClient();
   const [note, setNote] = useState<Record<string, string>>({});
 
+  const isRecipient = mode === "distributor" || mode === "csa-incoming";
+
   const { data: deliveries } = useQuery({
-    queryKey: ["deliveries", mode, distributorId ?? "all"],
+    queryKey: ["deliveries", mode, distributorId ?? csaId ?? "all"],
     queryFn: async () => {
       let q = supabase
         .from("deliveries")
         .select("*, distributors(name, city), csas(name, city), orders(order_no, total_amount)")
         .order("created_at", { ascending: false })
         .limit(200);
-      if (mode === "distributor" && distributorId) q = q.eq("distributor_id", distributorId);
+
+      if (mode === "distributor") {
+        if (distributorId) q = q.eq("distributor_id", distributorId);
+      } else if (mode === "csa-incoming") {
+        q = q.is("distributor_id", null);
+        if (csaId) q = q.eq("csa_id", csaId);
+      } else if (mode === "csa") {
+        q = q.not("distributor_id", "is", null);
+        if (csaId) q = q.eq("csa_id", csaId);
+      } else if (mode === "depot") {
+        q = q.is("distributor_id", null);
+      }
+
       const { data } = await q;
       return data ?? [];
     },
@@ -47,20 +63,24 @@ export function DeliveryList({ mode, distributorId, action }: Props) {
 
   const receive = useMutation({
     mutationFn: async ({ id, accept }: { id: string; accept: boolean }) => {
-      const { error } = await supabase.rpc("receive_delivery", {
-        _id: id,
-        _accept: accept,
-        _note: note[id]?.trim() ?? "",
+      await receiveDeliveryServerFn({
+        data: {
+          id,
+          accept,
+          note: note[id]?.trim() ?? "",
+        },
       });
-      if (error) throw error;
     },
     onSuccess: (_d, v) => {
       toast.success(
-        v.accept ? "Delivery received — stock released from reserve and ready for sale" : "Delivery rejected — reserved stock reversed",
+        v.accept
+          ? "Delivery received — stock released from reserve and ready for sale"
+          : "Delivery rejected — reserved stock reversed",
       );
       qc.invalidateQueries({ queryKey: ["deliveries"] });
       qc.invalidateQueries({ queryKey: ["distributor-panel"] });
       qc.invalidateQueries({ queryKey: ["csa-panel"] });
+      qc.invalidateQueries({ queryKey: ["depot-panel"] });
     },
     onError: (e: Error) => toast.error(e.message),
   });
@@ -68,14 +88,21 @@ export function DeliveryList({ mode, distributorId, action }: Props) {
   const rows = deliveries ?? [];
   const inTransit = rows.filter((d) => d.status === "in_transit");
 
+  const title =
+    mode === "csa-incoming"
+      ? "Incoming from Master Depot"
+      : mode === "distributor"
+        ? "Incoming deliveries"
+        : mode === "depot"
+          ? "Dispatches to CSAs"
+          : "Dispatches to distributors";
+
   return (
-    <Section
-      title={mode === "csa" ? "Dispatches to distributors" : "Incoming deliveries"}
-      action={action}
-    >
-      {mode === "distributor" && inTransit.length > 0 ? (
+    <Section title={title} action={action}>
+      {isRecipient && inTransit.length > 0 ? (
         <p className="border-b border-border/60 bg-muted/40 p-3 text-xs text-muted-foreground">
-          {inTransit.length} consignment(s) in transit. Stock stays reserved until you accept the delivery.
+          {inTransit.length} consignment(s) in transit. Stock stays reserved until you accept the
+          delivery.
         </p>
       ) : null}
       <div className="divide-y divide-border/60">
@@ -84,6 +111,10 @@ export function DeliveryList({ mode, distributorId, action }: Props) {
         ) : (
           rows.map((d) => {
             const ord = d.orders as { order_no: string; total_amount: number } | null;
+            const partyName =
+              (d.distributors as { name: string } | null)?.name ??
+              (d.csas as { name: string } | null)?.name ??
+              "Consignee";
             return (
               <div key={d.id} className="space-y-2 p-3 text-sm">
                 <div className="flex items-start justify-between gap-3">
@@ -92,20 +123,29 @@ export function DeliveryList({ mode, distributorId, action }: Props) {
                       LR {d.lr_no} • {d.transporter_name}
                     </p>
                     <p className="text-[11px] text-muted-foreground">
-                      {ord?.order_no ?? "Order"} • {(d.distributors as { name: string } | null)?.name}
+                      {ord?.order_no ?? "Order"} • {partyName}
                       {ord ? ` • ${inr(ord.total_amount)}` : ""}
                     </p>
                     <p className="text-[11px] text-muted-foreground">
                       Mobile {d.transporter_mobile ?? "—"}
-                      {d.vehicle_no ? ` • Vehicle ${d.vehicle_no}` : ""} • Dispatched {d.dispatch_date}
+                      {d.vehicle_no ? ` • Vehicle ${d.vehicle_no}` : ""} • Dispatched{" "}
+                      {d.dispatch_date}
                     </p>
-                    {d.remarks ? <p className="text-[11px] text-muted-foreground">Remark: {d.remarks}</p> : null}
-                    {d.receive_note ? <p className="text-[11px] text-muted-foreground">Receipt note: {d.receive_note}</p> : null}
+                    {d.remarks ? (
+                      <p className="text-[11px] text-muted-foreground">Remark: {d.remarks}</p>
+                    ) : null}
+                    {d.receive_note ? (
+                      <p className="text-[11px] text-muted-foreground">
+                        Receipt note: {d.receive_note}
+                      </p>
+                    ) : null}
                   </div>
-                  <Badge variant={TONE[d.status] ?? "secondary"}>{LABEL[d.status] ?? d.status}</Badge>
+                  <Badge variant={TONE[d.status] ?? "secondary"}>
+                    {LABEL[d.status] ?? d.status}
+                  </Badge>
                 </div>
 
-                {mode === "distributor" && d.status === "in_transit" ? (
+                {isRecipient && d.status === "in_transit" ? (
                   <div className="flex flex-col gap-2 sm:flex-row">
                     <Input
                       className="h-9 sm:flex-1"
@@ -114,7 +154,11 @@ export function DeliveryList({ mode, distributorId, action }: Props) {
                       onChange={(e) => setNote((p) => ({ ...p, [d.id]: e.target.value }))}
                     />
                     <div className="flex gap-2">
-                      <Button size="sm" disabled={receive.isPending} onClick={() => receive.mutate({ id: d.id, accept: true })}>
+                      <Button
+                        size="sm"
+                        disabled={receive.isPending}
+                        onClick={() => receive.mutate({ id: d.id, accept: true })}
+                      >
                         Accept stock
                       </Button>
                       <Button

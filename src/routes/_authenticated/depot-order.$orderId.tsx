@@ -15,9 +15,17 @@ export const Route = createFileRoute("/_authenticated/depot-order/$orderId")({
   head: () => ({
     meta: [
       { title: "Depot Order — POPPiK SFA" },
-      { name: "description", content: "Master depot review of a CSA depot order: adjust quantities against live depot stock, then approve or reject." },
+      {
+        name: "description",
+        content:
+          "Master depot review of a CSA depot order: adjust quantities against live depot stock, then approve or reject.",
+      },
       { property: "og:title", content: "Depot Order — POPPiK SFA" },
-      { property: "og:description", content: "Adjust quantities against live master depot stock and approve or reject the CSA order." },
+      {
+        property: "og:description",
+        content:
+          "Adjust quantities against live master depot stock and approve or reject the CSA order.",
+      },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },
     ],
@@ -32,16 +40,26 @@ function DepotOrderPage() {
   const [qty, setQty] = useState<Record<string, string>>({});
   const [notes, setNotes] = useState("");
 
+  const [transporter, setTransporter] = useState("");
+  const [lrNo, setLrNo] = useState("");
+  const [vehicleNo, setVehicleNo] = useState("");
+  const [mobile, setMobile] = useState("");
+
   const { data, isLoading } = useQuery({
     queryKey: ["depot-order", orderId],
     queryFn: async () => {
       const { data: order, error } = await supabase
         .from("orders")
-        .select("*, csas(*), depots(*), order_items(id, qty, free_qty, rate, amount, product_id, products(name, sku))")
+        .select(
+          "*, csas(*), depots(*), order_items(id, qty, free_qty, rate, amount, product_id, products(name, sku))",
+        )
         .eq("id", orderId)
         .single();
       if (error) throw error;
-      const { data: stock } = await supabase.from("depot_stock").select("*").eq("depot_id", order.depot_id!);
+      const { data: stock } = await supabase
+        .from("depot_stock")
+        .select("*")
+        .eq("depot_id", order.depot_id!);
       return { order, stock: stock ?? [] };
     },
   });
@@ -55,6 +73,7 @@ function DepotOrderPage() {
     for (const it of order.order_items ?? []) next[it.id] = String(it.qty);
     setQty(next);
     setNotes(order.notes ?? "");
+    setLrNo(`LR-${order.order_no}`);
   }, [order]);
 
   const availableFor = (productId: string) => {
@@ -62,8 +81,13 @@ function DepotOrderPage() {
     return row ? Math.max(0, row.physical_qty - row.reserved_qty) : 0;
   };
 
-  const newTotal = items.reduce((s, it) => s + Number(it.rate) * (Number(qty[it.id] ?? it.qty) || 0), 0);
-  const anyShort = items.some((it) => (Number(qty[it.id] ?? it.qty) || 0) > availableFor(it.product_id));
+  const newTotal = items.reduce(
+    (s, it) => s + Number(it.rate) * (Number(qty[it.id] ?? it.qty) || 0),
+    0,
+  );
+  const anyShort = items.some(
+    (it) => (Number(qty[it.id] ?? it.qty) || 0) > availableFor(it.product_id),
+  );
 
   const save = useMutation({
     mutationFn: async () => {
@@ -114,7 +138,9 @@ function DepotOrderPage() {
       for (const it of effective) {
         const available = availableFor(it.product_id);
         if (it.q > available) {
-          throw new Error(`Only ${available} pcs available for ${(it.products as { name: string } | null)?.name ?? "item"}`);
+          throw new Error(
+            `Only ${available} pcs available for ${(it.products as { name: string } | null)?.name ?? "item"}`,
+          );
         }
       }
 
@@ -131,7 +157,10 @@ function DepotOrderPage() {
         if (depotRow) {
           await supabase
             .from("depot_stock")
-            .update({ physical_qty: Math.max(0, depotRow.physical_qty - it.q), updated_at: new Date().toISOString() })
+            .update({
+              physical_qty: Math.max(0, depotRow.physical_qty - it.q),
+              updated_at: new Date().toISOString(),
+            })
             .eq("id", depotRow.id);
         }
         const { data: csaRow } = await supabase
@@ -143,25 +172,68 @@ function DepotOrderPage() {
         if (csaRow) {
           await supabase
             .from("csa_stock")
-            .update({ physical_qty: csaRow.physical_qty + it.q, updated_at: new Date().toISOString() })
+            .update({
+              physical_qty: csaRow.physical_qty + it.q,
+              reserved_qty: (csaRow.reserved_qty ?? 0) + it.q,
+              updated_at: new Date().toISOString(),
+            })
             .eq("id", csaRow.id);
         } else {
           await supabase.from("csa_stock").insert({
             csa_id: order.csa_id!,
             product_id: it.product_id,
             physical_qty: it.q,
-            reserved_qty: 0,
+            reserved_qty: it.q,
           });
         }
       }
 
-      const { error } = await supabase.from("orders").update({ status: "dispatched" }).eq("id", orderId);
+      const dispatchNote = notes.trim() || "Dispatched from Master Depot";
+      const lrNumber = lrNo.trim() || `LR-${order.order_no}`;
+      const transName = transporter.trim() || "Company Transport";
+
+      try {
+        await supabase.from("deliveries").insert({
+          order_id: orderId,
+          csa_id: order.csa_id,
+          distributor_id: null as any,
+          transporter_name: transName,
+          lr_no: lrNumber,
+          transporter_mobile: mobile.trim() || null,
+          vehicle_no: vehicleNo.trim() || null,
+          dispatch_date: new Date().toISOString().slice(0, 10),
+          remarks: dispatchNote,
+          status: "in_transit",
+        });
+      } catch (delErr) {
+        console.warn("Could not insert delivery row (fallback to order metadata):", delErr);
+      }
+
+      const formattedNotes = [
+        dispatchNote,
+        `LR: ${lrNumber}`,
+        `Transporter: ${transName}`,
+        vehicleNo.trim() ? `Vehicle: ${vehicleNo.trim()}` : null,
+        mobile.trim() ? `Mobile: ${mobile.trim()}` : null,
+      ]
+        .filter(Boolean)
+        .join(" • ");
+
+      const { error } = await supabase
+        .from("orders")
+        .update({ status: "dispatched", notes: formattedNotes })
+        .eq("id", orderId);
       if (error) throw error;
     },
     onSuccess: (_r, vars) => {
       qc.invalidateQueries({ queryKey: ["depot-panel"] });
       qc.invalidateQueries({ queryKey: ["csa-panel"] });
-      toast.success(vars.accept ? "Order approved and invoiced. Stock moved to the CSA warehouse." : "Order rejected");
+      qc.invalidateQueries({ queryKey: ["deliveries"] });
+      toast.success(
+        vars.accept
+          ? "Order approved & dispatched. Stock moved to CSA reserve (In-Transit) until CSA confirms receipt."
+          : "Order rejected",
+      );
       navigate({ to: "/depot" });
     },
     onError: (e: Error) => toast.error(e.message),
@@ -215,10 +287,14 @@ function DepotOrderPage() {
               <div key={it.id} className="p-3">
                 <div className="flex items-center justify-between gap-3">
                   <div className="min-w-0">
-                    <p className="truncate text-sm font-medium">{(it.products as { name: string } | null)?.name}</p>
+                    <p className="truncate text-sm font-medium">
+                      {(it.products as { name: string } | null)?.name}
+                    </p>
                     <p className="text-[11px] text-muted-foreground">
                       Asked {it.qty} pcs • Rate {exactInr(it.rate)} •{" "}
-                      <span className={short ? "text-warning" : "text-success"}>Stock {available}</span>
+                      <span className={short ? "text-warning" : "text-success"}>
+                        Stock {available}
+                      </span>
                     </p>
                   </div>
                   {editable ? (
@@ -244,8 +320,47 @@ function DepotOrderPage() {
       </Section>
 
       {editable ? (
-        <Section title="Actions">
+        <Section title="Actions & Dispatch Details">
           <div className="space-y-3 p-3">
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div className="grid gap-1.5">
+                <Label htmlFor="do-transporter">Transporter Name</Label>
+                <Input
+                  id="do-transporter"
+                  value={transporter}
+                  placeholder="e.g. VRL Logistics, Direct Transport"
+                  onChange={(e) => setTransporter(e.target.value)}
+                />
+              </div>
+              <div className="grid gap-1.5">
+                <Label htmlFor="do-lr">LR / Bilty Number</Label>
+                <Input
+                  id="do-lr"
+                  value={lrNo}
+                  placeholder={`LR-${order.order_no}`}
+                  onChange={(e) => setLrNo(e.target.value)}
+                />
+              </div>
+              <div className="grid gap-1.5">
+                <Label htmlFor="do-vehicle">Vehicle No. (optional)</Label>
+                <Input
+                  id="do-vehicle"
+                  value={vehicleNo}
+                  placeholder="e.g. DL 01 AB 1234"
+                  onChange={(e) => setVehicleNo(e.target.value)}
+                />
+              </div>
+              <div className="grid gap-1.5">
+                <Label htmlFor="do-mobile">Driver / Transporter Mobile (optional)</Label>
+                <Input
+                  id="do-mobile"
+                  value={mobile}
+                  placeholder="10-digit mobile number"
+                  onChange={(e) => setMobile(e.target.value)}
+                />
+              </div>
+            </div>
+
             <div className="grid gap-1.5">
               <Label htmlFor="do-notes">Remark (optional)</Label>
               <Input
@@ -260,23 +375,38 @@ function DepotOrderPage() {
               <span className="font-semibold">{inr(newTotal)}</span>
             </div>
             <div className="flex flex-wrap gap-2">
-              <Button disabled={save.isPending || act.isPending} variant="outline" onClick={() => save.mutate()}>
+              <Button
+                disabled={save.isPending || act.isPending}
+                variant="outline"
+                onClick={() => save.mutate()}
+              >
                 <Save className="mr-1 size-3.5" /> Save changes
               </Button>
-              <Button disabled={act.isPending || anyShort || newTotal <= 0} onClick={() => act.mutate({ accept: true })}>
+              <Button
+                disabled={act.isPending || anyShort || newTotal <= 0}
+                onClick={() => act.mutate({ accept: true })}
+              >
                 <CheckCircle2 className="mr-1 size-3.5" /> Approve • Invoice • Dispatch
               </Button>
-              <Button variant="outline" disabled={act.isPending} onClick={() => act.mutate({ accept: false })}>
+              <Button
+                variant="outline"
+                disabled={act.isPending}
+                onClick={() => act.mutate({ accept: false })}
+              >
                 <XCircle className="mr-1 size-3.5" /> Reject
               </Button>
             </div>
             {anyShort ? (
-              <p className="text-[11px] font-medium text-warning">Reduce the stock-short quantities before approving.</p>
+              <p className="text-[11px] font-medium text-warning">
+                Reduce the stock-short quantities before approving.
+              </p>
             ) : null}
           </div>
         </Section>
       ) : (
-        <p className="mt-4 text-sm text-muted-foreground">This order is {order.status} and can no longer be edited.</p>
+        <p className="mt-4 text-sm text-muted-foreground">
+          This order is {order.status} and can no longer be edited.
+        </p>
       )}
     </Shell>
   );

@@ -10,7 +10,13 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { compactInr, inr } from "@/lib/sfa";
 import { downloadInvoicePdf } from "@/lib/invoice-pdf";
@@ -22,9 +28,15 @@ export const Route = createFileRoute("/_authenticated/depot")({
   head: () => ({
     meta: [
       { title: "Master Depot — POPPiK SFA" },
-      { name: "description", content: "Master depot control: CSA purchase orders, depot stock, invoices and dispatch." },
+      {
+        name: "description",
+        content: "Master depot control: CSA purchase orders, depot stock, invoices and dispatch.",
+      },
       { property: "og:title", content: "Master Depot — POPPiK SFA" },
-      { property: "og:description", content: "Approve CSA depot orders, invoice them and move stock down to super stockists." },
+      {
+        property: "og:description",
+        content: "Approve CSA depot orders, invoice them and move stock down to super stockists.",
+      },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },
     ],
@@ -44,21 +56,24 @@ function DepotPage() {
   const [orderSearch, setOrderSearch] = useState("");
   const [payNote, setPayNote] = useState<Record<string, string>>({});
 
-
-
   const { data } = useQuery({
     queryKey: ["depot-panel", myDepotId],
     queryFn: async () => {
       let orderQ = supabase
         .from("orders")
-        .select("*, csas(*), depots(*), order_items(id, qty, free_qty, rate, amount, products(name, sku, hsn, mrp))")
+        .select(
+          "*, csas(*), depots(*), order_items(id, qty, free_qty, rate, amount, products(name, sku, hsn, mrp))",
+        )
         .eq("kind", "depot")
         .order("created_at", { ascending: false });
       if (myDepotId) orderQ = orderQ.eq("depot_id", myDepotId);
       const [orders, stock, csas, depots, invoices, payouts] = await Promise.all([
         orderQ,
         myDepotId
-          ? supabase.from("depot_stock").select("*, products(name, sku, pts)").eq("depot_id", myDepotId)
+          ? supabase
+              .from("depot_stock")
+              .select("*, products(name, sku, pts)")
+              .eq("depot_id", myDepotId)
           : supabase.from("depot_stock").select("*, products(name, sku, pts)"),
         myDepotId
           ? supabase.from("csas").select("*").eq("depot_id", myDepotId).order("name")
@@ -66,9 +81,15 @@ function DepotPage() {
         supabase.from("depots").select("*").order("name"),
         supabase
           .from("invoices")
-          .select("*, orders(order_no, discount_amount, kind, depot_id, csas(*), order_items(id, qty, free_qty, rate, amount, products(name, sku, hsn, mrp)))")
+          .select(
+            "*, orders(order_no, discount_amount, kind, depot_id, csas(*), order_items(id, qty, free_qty, rate, amount, products(name, sku, hsn, mrp)))",
+          )
           .order("created_at", { ascending: false }),
-        supabase.from("expenses").select("*").order("expense_date", { ascending: false }).limit(200),
+        supabase
+          .from("expenses")
+          .select("*")
+          .order("expense_date", { ascending: false })
+          .limit(200),
       ]);
       return {
         orders: orders.data ?? [],
@@ -141,47 +162,61 @@ function DepotPage() {
   const filteredStock = (data?.stock ?? []).filter((s) => {
     const p = s.products as { name?: string; sku?: string } | null;
     const q = stockSearch.trim().toLowerCase();
-    return !q || (p?.name ?? "").toLowerCase().includes(q) || (p?.sku ?? "").toLowerCase().includes(q);
+    return (
+      !q || (p?.name ?? "").toLowerCase().includes(q) || (p?.sku ?? "").toLowerCase().includes(q)
+    );
   });
 
-  const csaLedger = (data?.csas ?? []).map((c) => {
-    const rows = (data?.invoices ?? []).filter(
-      (i) => ((i.orders as { csas: { id?: string } | null } | null)?.csas as { id?: string } | null)?.id === c.id,
+  const csaLedger = (data?.csas ?? [])
+    .map((c) => {
+      const rows = (data?.invoices ?? []).filter(
+        (i) =>
+          ((i.orders as { csas: { id?: string } | null } | null)?.csas as { id?: string } | null)
+            ?.id === c.id,
+      );
+      const billed = rows.reduce((s, i) => s + Number(i.net_amount), 0);
+      const received = (csaCollections ?? [])
+        .filter((col: any) => col.csa_id === c.id && col.status === "approved")
+        .reduce((s: number, col: any) => s + Number(col.amount), 0);
+      const balance = Math.max(0, billed - received);
+      return {
+        id: c.id,
+        name: c.name,
+        area: c.city ?? "—",
+        billed,
+        received,
+        balance,
+        bills: rows.length,
+        billRows: rows.map((i) => ({
+          id: i.id,
+          invoiceNo: i.invoice_no,
+          orderNo: (i.orders as { order_no: string } | null)?.order_no ?? "—",
+          date: new Date(i.created_at).toLocaleDateString("en-IN"),
+          amount: Number(i.net_amount),
+        })),
+      };
+    })
+    .filter(
+      (c) => !ledgerSearch || c.name.toLowerCase().includes(ledgerSearch.trim().toLowerCase()),
     );
-    const billed = rows.reduce((s, i) => s + Number(i.net_amount), 0);
-    const received = (csaCollections ?? [])
-      .filter((col: any) => col.csa_id === c.id && col.status === "approved")
-      .reduce((s: number, col: any) => s + Number(col.amount), 0);
-    const balance = Math.max(0, billed - received);
-    return {
-      id: c.id,
-      name: c.name,
-      area: c.city ?? "—",
-      billed,
-      received,
-      balance,
-      bills: rows.length,
-      billRows: rows.map((i) => ({
-        id: i.id,
-        invoiceNo: i.invoice_no,
-        orderNo: (i.orders as { order_no: string } | null)?.order_no ?? "—",
-        date: new Date(i.created_at).toLocaleDateString("en-IN"),
-        amount: Number(i.net_amount),
-      })),
-    };
-  }).filter((c) => !ledgerSearch || c.name.toLowerCase().includes(ledgerSearch.trim().toLowerCase()));
   const payouts = data?.payouts ?? [];
   const payoutTotal = payouts.reduce((s, e) => s + Number(e.total_amount ?? 0), 0);
 
-
-
-
   if (me && !myDepotId) {
-    return <DepotSetup depots={data?.depots ?? []} userId={userId} onDone={() => qc.invalidateQueries()} />;
+    return (
+      <DepotSetup
+        depots={data?.depots ?? []}
+        userId={userId}
+        onDone={() => qc.invalidateQueries()}
+      />
+    );
   }
 
   return (
-    <Shell title="Master Depot" subtitle={`${myDepot?.name ?? "Depot"} • CSA orders • stock • dispatch`}>
+    <Shell
+      title="Master Depot"
+      subtitle={`${myDepot?.name ?? "Depot"} • CSA orders • stock • dispatch`}
+    >
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 md:grid-cols-4">
         <StatCard
           label="Pending CSA Orders"
@@ -227,14 +262,17 @@ function DepotPage() {
           <Link to="/company-purchase">Order from Company</Link>
         </Button>
         <Button asChild size="sm" variant="outline">
-          <Link to="/business-reports" search={{ panel: "depot" }}>Analytics dashboard</Link>
+          <Link to="/business-reports" search={{ panel: "depot" }}>
+            Analytics dashboard
+          </Link>
         </Button>
-
       </div>
 
       <Tabs defaultValue="orders" className="mt-6">
         <TabsList>
-          <TabsTrigger value="orders">CSA Orders{pending.length ? ` (${pending.length})` : ""}</TabsTrigger>
+          <TabsTrigger value="orders">
+            CSA Orders{pending.length ? ` (${pending.length})` : ""}
+          </TabsTrigger>
           <TabsTrigger value="godown">Godown Billing</TabsTrigger>
           <TabsTrigger value="stock">Depot Stock</TabsTrigger>
           <TabsTrigger value="invoices">Sales Invoices</TabsTrigger>
@@ -245,7 +283,6 @@ function DepotPage() {
           <TabsTrigger value="paymentout">Payment Out</TabsTrigger>
           <TabsTrigger value="ledger">Party Ledger</TabsTrigger>
         </TabsList>
-
 
         <TabsContent value="godown">
           <Section
@@ -267,7 +304,8 @@ function DepotPage() {
                         {o.order_no} • {(o.csas as { name: string } | null)?.name ?? "CSA"}
                       </p>
                       <p className="text-[11px] text-muted-foreground">
-                        {(o.order_items ?? []).length} SKU • {new Date(o.created_at).toLocaleDateString("en-IN")}
+                        {(o.order_items ?? []).length} SKU •{" "}
+                        {new Date(o.created_at).toLocaleDateString("en-IN")}
                       </p>
                     </div>
                     <div className="flex shrink-0 items-center gap-3">
@@ -283,30 +321,37 @@ function DepotPage() {
 
         <TabsContent value="delivery">
           <DeliveryList
-            mode="csa"
+            mode="depot"
             action={
               <Button asChild size="sm">
-                <Link to="/delivery-note" search={{ order: undefined }}>Add LR / dispatch</Link>
+                <Link to="/delivery-note" search={{ order: undefined }}>
+                  Add LR / dispatch
+                </Link>
               </Button>
             }
           />
         </TabsContent>
 
         <TabsContent value="paymentin" className="space-y-4">
-          <Section 
+          <Section
             title={`Payments from Super Stockists (CSAs)${pendingCsaCollections.length ? ` (${pendingCsaCollections.length} pending)` : ""}`}
             action={
               <Button asChild size="sm">
-                <Link to="/payment-in" search={{ partyId: "" }}>Manual Payment In</Link>
+                <Link to="/payment-in" search={{ partyId: "" }}>
+                  Manual Payment In
+                </Link>
               </Button>
             }
           >
             <div className="divide-y divide-border/60">
               {(csaCollections ?? []).length === 0 ? (
-                <p className="p-4 text-sm text-muted-foreground">No payments received from CSAs yet.</p>
+                <p className="p-4 text-sm text-muted-foreground">
+                  No payments received from CSAs yet.
+                </p>
               ) : (
                 (csaCollections ?? []).map((p) => {
-                  const csaName = (p.csas as { name?: string; city?: string } | null)?.name ?? "Super Stockist";
+                  const csaName =
+                    (p.csas as { name?: string; city?: string } | null)?.name ?? "Super Stockist";
                   return (
                     <div key={p.id} className="space-y-2 p-3 text-sm">
                       <div className="flex items-start justify-between gap-3">
@@ -317,7 +362,9 @@ function DepotPage() {
                             {p.reference ? ` • Ref: ${p.reference}` : ""}
                           </p>
                           {p.review_note ? (
-                            <p className="text-[11px] text-muted-foreground">Note: {p.review_note}</p>
+                            <p className="text-[11px] text-muted-foreground">
+                              Note: {p.review_note}
+                            </p>
                           ) : null}
                         </div>
                         <div className="text-right">
@@ -327,8 +374,8 @@ function DepotPage() {
                               p.status === "approved"
                                 ? "default"
                                 : p.status === "rejected"
-                                ? "destructive"
-                                : "secondary"
+                                  ? "destructive"
+                                  : "secondary"
                             }
                           >
                             {p.status}
@@ -380,9 +427,15 @@ function DepotPage() {
                     </span>
                   </div>
                   {(data?.invoices ?? []).map((i) => {
-                    const o = i.orders as { order_no: string; csas: { name: string } | null } | null;
+                    const o = i.orders as {
+                      order_no: string;
+                      csas: { name: string } | null;
+                    } | null;
                     return (
-                      <div key={i.id} className="flex items-center justify-between gap-3 p-3 text-sm">
+                      <div
+                        key={i.id}
+                        className="flex items-center justify-between gap-3 p-3 text-sm"
+                      >
                         <div className="min-w-0">
                           <p className="truncate font-medium">{i.invoice_no}</p>
                           <p className="text-[11px] text-muted-foreground">
@@ -390,7 +443,9 @@ function DepotPage() {
                             {new Date(i.created_at).toLocaleDateString("en-IN")}
                           </p>
                         </div>
-                        <span className="shrink-0 font-semibold tabular-nums">{inr(i.net_amount)}</span>
+                        <span className="shrink-0 font-semibold tabular-nums">
+                          {inr(i.net_amount)}
+                        </span>
                       </div>
                     );
                   })}
@@ -411,7 +466,9 @@ function DepotPage() {
           >
             <div className="divide-y divide-border/60">
               {payouts.length === 0 ? (
-                <p className="p-4 text-sm text-muted-foreground">No outgoing payments booked yet.</p>
+                <p className="p-4 text-sm text-muted-foreground">
+                  No outgoing payments booked yet.
+                </p>
               ) : (
                 <>
                   <div className="flex items-center justify-between gap-3 bg-muted/40 p-3 text-sm">
@@ -423,10 +480,13 @@ function DepotPage() {
                       <div className="min-w-0">
                         <p className="truncate font-medium">{e.kind}</p>
                         <p className="text-[11px] text-muted-foreground">
-                          {new Date(e.expense_date).toLocaleDateString("en-IN")} • {e.vendor || e.route || "—"} • {e.status}
+                          {new Date(e.expense_date).toLocaleDateString("en-IN")} •{" "}
+                          {e.vendor || e.route || "—"} • {e.status}
                         </p>
                       </div>
-                      <span className="shrink-0 font-semibold tabular-nums">{inr(Number(e.total_amount ?? 0))}</span>
+                      <span className="shrink-0 font-semibold tabular-nums">
+                        {inr(Number(e.total_amount ?? 0))}
+                      </span>
                     </div>
                   ))}
                 </>
@@ -447,7 +507,12 @@ function DepotPage() {
             <div className="p-3">
               <div className="relative">
                 <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-                <Input value={ledgerSearch} onChange={(e) => setLedgerSearch(e.target.value)} placeholder="Search CSA..." className="pl-9 h-9" />
+                <Input
+                  value={ledgerSearch}
+                  onChange={(e) => setLedgerSearch(e.target.value)}
+                  placeholder="Search CSA..."
+                  className="pl-9 h-9"
+                />
               </div>
             </div>
             <div className="divide-y divide-border/60">
@@ -464,18 +529,26 @@ function DepotPage() {
                       <div className="min-w-0">
                         <p className="truncate font-medium">{p.name}</p>
                         <p className="text-[11px] text-muted-foreground">
-                          {p.area} • Billed {inr(p.billed)} • Received {inr(p.received)} • {p.bills} bill(s)
+                          {p.area} • Billed {inr(p.billed)} • Received {inr(p.received)} • {p.bills}{" "}
+                          bill(s)
                         </p>
                       </div>
-                      <span className="shrink-0 font-semibold tabular-nums text-foreground">{inr(p.balance)}</span>
+                      <span className="shrink-0 font-semibold tabular-nums text-foreground">
+                        {inr(p.balance)}
+                      </span>
                     </button>
                     {openCsa === p.id ? (
                       <div className="bg-muted/30 px-3 pb-3">
                         {p.billRows.length === 0 ? (
-                          <p className="py-2 text-[12px] text-muted-foreground">No bills for this CSA yet.</p>
+                          <p className="py-2 text-[12px] text-muted-foreground">
+                            No bills for this CSA yet.
+                          </p>
                         ) : (
                           p.billRows.map((b) => (
-                            <div key={b.id} className="flex items-center justify-between gap-3 py-1.5 text-[12px]">
+                            <div
+                              key={b.id}
+                              className="flex items-center justify-between gap-3 py-1.5 text-[12px]"
+                            >
                               <span className="min-w-0 truncate">
                                 {b.invoiceNo} • {b.orderNo} • {b.date}
                               </span>
@@ -492,14 +565,17 @@ function DepotPage() {
           </Section>
         </TabsContent>
 
-
-
         <TabsContent value="orders">
           <Section title="Depot Orders from CSA">
             <div className="p-3">
               <div className="relative">
                 <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-                <Input value={orderSearch} onChange={(e) => setOrderSearch(e.target.value)} placeholder="Search order no. or CSA..." className="pl-9 h-9" />
+                <Input
+                  value={orderSearch}
+                  onChange={(e) => setOrderSearch(e.target.value)}
+                  placeholder="Search order no. or CSA..."
+                  className="pl-9 h-9"
+                />
               </div>
             </div>
             <div className="divide-y divide-border/60">
@@ -518,12 +594,17 @@ function DepotPage() {
                         {o.order_no} • {(o.csas as { name: string } | null)?.name ?? "CSA"}
                       </p>
                       <p className="text-[11px] text-muted-foreground">
-                        {(o.order_items ?? []).length} SKU • {new Date(o.created_at).toLocaleDateString("en-IN")}
+                        {(o.order_items ?? []).length} SKU •{" "}
+                        {new Date(o.created_at).toLocaleDateString("en-IN")}
                       </p>
                     </div>
                     <div className="flex shrink-0 items-center gap-3">
-                      <span className="text-sm font-semibold tabular-nums">{inr(o.total_amount)}</span>
-                      <Badge variant={o.status === "pending" ? "default" : "secondary"}>{o.status}</Badge>
+                      <span className="text-sm font-semibold tabular-nums">
+                        {inr(o.total_amount)}
+                      </span>
+                      <Badge variant={o.status === "pending" ? "default" : "secondary"}>
+                        {o.status}
+                      </Badge>
                     </div>
                   </Link>
                 ))
@@ -544,7 +625,6 @@ function DepotPage() {
                   <Link to="/godown-sale">Bill a CSA</Link>
                 </Button>
               </div>
-
             }
           >
             <div className="space-y-3">
@@ -557,20 +637,29 @@ function DepotPage() {
               <div className="divide-y divide-border/60 rounded-md border">
                 {filteredStock.length === 0 ? (
                   <p className="p-4 text-sm text-muted-foreground">
-                    {stockSearch ? "No matching stock found." : "No depot stock yet — add opening stock first."}
+                    {stockSearch
+                      ? "No matching stock found."
+                      : "No depot stock yet — add opening stock first."}
                   </p>
                 ) : (
                   filteredStock.map((s) => (
                     <div key={s.id} className="flex items-center justify-between p-3 text-sm">
                       <div className="min-w-0">
-                        <p className="truncate font-medium">{(s.products as { name: string } | null)?.name}</p>
+                        <p className="truncate font-medium">
+                          {(s.products as { name: string } | null)?.name}
+                        </p>
                         <p className="text-[11px] text-muted-foreground">
-                          {(s.products as { sku: string } | null)?.sku ?? "—"} • Batch: {s.batch_no ?? "—"}
+                          {(s.products as { sku: string } | null)?.sku ?? "—"} • Batch:{" "}
+                          {s.batch_no ?? "—"}
                         </p>
                       </div>
                       <div className="text-right">
-                        <p className="font-semibold tabular-nums">{s.physical_qty - s.reserved_qty} pcs</p>
-                        <p className="text-[11px] text-muted-foreground">Physical {s.physical_qty}</p>
+                        <p className="font-semibold tabular-nums">
+                          {s.physical_qty - s.reserved_qty} pcs
+                        </p>
+                        <p className="text-[11px] text-muted-foreground">
+                          Physical {s.physical_qty}
+                        </p>
                       </div>
                     </div>
                   ))
@@ -579,7 +668,6 @@ function DepotPage() {
             </div>
           </Section>
         </TabsContent>
-
 
         <TabsContent value="invoices">
           <Section title="Depot GST Invoices">
@@ -593,7 +681,14 @@ function DepotPage() {
                     depot_id: string | null;
                     csas: Record<string, string | null> | null;
                     order_items:
-                      | { id: string; qty: number; free_qty: number; rate: number; amount: number; products: { name: string } | null }[]
+                      | {
+                          id: string;
+                          qty: number;
+                          free_qty: number;
+                          rate: number;
+                          amount: number;
+                          products: { name: string } | null;
+                        }[]
                       | null;
                   } | null;
                   return (
@@ -601,7 +696,8 @@ function DepotPage() {
                       <div>
                         <p className="font-medium">{i.invoice_no}</p>
                         <p className="text-[11px] text-muted-foreground">
-                          {ord?.order_no} • {ord?.csas?.['name']} • CGST {inr(i.cgst)} • SGST {inr(i.sgst)}
+                          {ord?.order_no} • {ord?.csas?.["name"]} • CGST {inr(i.cgst)} • SGST{" "}
+                          {inr(i.sgst)}
                         </p>
                       </div>
                       <div className="flex items-center gap-2">
@@ -626,7 +722,9 @@ function DepotPage() {
                                 qty: it.qty,
                                 freeQty: it.free_qty,
                                 rate: Number(it.rate),
-                                amount: Number(it.amount), hsn: (it.products as any)?.hsn, mrp: (it.products as any)?.mrp,
+                                amount: Number(it.amount),
+                                hsn: (it.products as any)?.hsn,
+                                mrp: (it.products as any)?.mrp,
                               })),
                               discountAmount: Number((ord as any)?.discount_amount) || undefined,
                               taxable: Number(i.taxable_value),
@@ -679,7 +777,10 @@ function DepotSetup({
         if (error) throw error;
         depotId = data.id;
       }
-      const { error } = await supabase.from("profiles").update({ depot_id: depotId }).eq("id", userId);
+      const { error } = await supabase
+        .from("profiles")
+        .update({ depot_id: depotId })
+        .eq("id", userId);
       if (error) throw error;
     },
     onSuccess: () => {
@@ -715,7 +816,11 @@ function DepotSetup({
             <div className="grid gap-3 sm:grid-cols-3">
               <div className="space-y-1.5">
                 <Label>New depot name</Label>
-                <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="POPPiK Master Depot" />
+                <Input
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  placeholder="POPPiK Master Depot"
+                />
               </div>
               <div className="space-y-1.5">
                 <Label>City</Label>

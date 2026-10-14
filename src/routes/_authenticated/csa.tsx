@@ -16,14 +16,21 @@ import { toParty } from "@/lib/invoice-party";
 import { fetchParties } from "@/lib/party-ledger";
 import { MarginBudget } from "@/components/sfa/MarginBudget";
 import { useMe } from "@/hooks/useAuth";
+import { receiveDeliveryServerFn } from "@/lib/delivery-receive.functions";
 
 export const Route = createFileRoute("/_authenticated/csa")({
   head: () => ({
     meta: [
       { title: "CSA Panel — POPPiK SFA" },
-      { name: "description", content: "Super stockist panel: distributor orders, approvals, stock and dispatch." },
+      {
+        name: "description",
+        content: "Super stockist panel: distributor orders, approvals, stock and dispatch.",
+      },
       { property: "og:title", content: "CSA Panel — POPPiK SFA" },
-      { property: "og:description", content: "Approve distributor orders, invoice and move stock down the supply chain." },
+      {
+        property: "og:description",
+        content: "Approve distributor orders, invoice and move stock down the supply chain.",
+      },
     ],
   }),
   component: CsaPage,
@@ -81,38 +88,78 @@ function CsaPage() {
     onError: (e: Error) => toast.error(e.message),
   });
 
+  const receiveDepotOrder = useMutation({
+    mutationFn: async ({
+      orderId,
+      accept,
+      note,
+    }: {
+      orderId: string;
+      accept: boolean;
+      note?: string;
+    }) => {
+      await receiveDeliveryServerFn({
+        data: {
+          id: orderId,
+          orderId,
+          accept,
+          note: note?.trim() || "",
+        },
+      });
+    },
+    onSuccess: (_d, v) => {
+      toast.success(
+        v.accept
+          ? "Consignment received! Stock released into available warehouse inventory."
+          : "Consignment rejected.",
+      );
+      qc.invalidateQueries({ queryKey: ["csa-panel"] });
+      qc.invalidateQueries({ queryKey: ["deliveries"] });
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
   const pendingPayments = (payments ?? []).filter((p) => p.status === "pending");
   const pendingOutgoing = (outgoingPayments ?? []).filter((p) => p.status === "pending");
 
   const { data } = useQuery({
     queryKey: ["csa-panel", myCsaId],
     queryFn: async () => {
-      const [orders, stock, distributors, products, csas, invoices, depotOrders] = await Promise.all([
-        supabase
-          .from("orders")
-          .select("*, distributors(*), order_items(id, qty, free_qty, rate, product_id, products(name, sku, hsn, mrp))")
-          .eq("kind", "primary")
-          .order("created_at", { ascending: false }),
-        myCsaId
-          ? supabase.from("csa_stock").select("*, products(name, sku, pts), csas(name)").eq("csa_id", myCsaId)
-          : supabase.from("csa_stock").select("*, products(name, sku, pts), csas(name)"),
-        supabase.from("distributors").select("*"),
-        supabase.from("products").select("*").order("name"),
-        supabase.from("csas").select("*"),
-        supabase
-          .from("invoices")
-          .select(
-            "*, orders(order_no, discount_amount, kind, csa_id, depot_id, depots(*), distributors(*), order_items(id, qty, free_qty, rate, amount, products(name, sku, hsn, mrp)))",
-          )
-          .order("created_at", { ascending: false }),
-        supabase
-          .from("orders")
-          .select("*, depots(name, city), order_items(id)")
-          .eq("kind", "depot")
-          .order("created_at", { ascending: false }),
-      ]);
+      const [orders, stock, distributors, products, csas, invoices, depotOrders] =
+        await Promise.all([
+          supabase
+            .from("orders")
+            .select(
+              "*, distributors(*), order_items(id, qty, free_qty, rate, product_id, products(name, sku, hsn, mrp))",
+            )
+            .eq("kind", "primary")
+            .order("created_at", { ascending: false }),
+          myCsaId
+            ? supabase
+                .from("csa_stock")
+                .select("*, products(name, sku, pts), csas(name)")
+                .eq("csa_id", myCsaId)
+            : supabase.from("csa_stock").select("*, products(name, sku, pts), csas(name)"),
+          supabase.from("distributors").select("*"),
+          supabase.from("products").select("*").order("name"),
+          supabase.from("csas").select("*"),
+          supabase
+            .from("invoices")
+            .select(
+              "*, orders(order_no, discount_amount, kind, csa_id, depot_id, depots(*), distributors(*), order_items(id, qty, free_qty, rate, amount, products(name, sku, hsn, mrp)))",
+            )
+            .order("created_at", { ascending: false }),
+          supabase
+            .from("orders")
+            .select(
+              "*, depots(name, city), order_items(id, qty, free_qty, rate, amount, product_id, products(name, sku)), deliveries(*)",
+            )
+            .eq("kind", "depot")
+            .order("created_at", { ascending: false }),
+        ]);
       const allInvoices = invoices.data ?? [];
-      const invoiceOrder = (i: { orders: unknown }) => (i.orders as { kind: string; csa_id: string | null } | null);
+      const invoiceOrder = (i: { orders: unknown }) =>
+        i.orders as { kind: string; csa_id: string | null } | null;
       return {
         orders: orders.data ?? [],
         stock: stock.data ?? [],
@@ -123,7 +170,8 @@ function CsaPage() {
         csas: csas.data ?? [],
         invoices: allInvoices.filter((i) => invoiceOrder(i)?.kind === "primary"),
         purchaseInvoices: allInvoices.filter(
-          (i) => invoiceOrder(i)?.kind === "depot" && (!myCsaId || invoiceOrder(i)?.csa_id === myCsaId),
+          (i) =>
+            invoiceOrder(i)?.kind === "depot" && (!myCsaId || invoiceOrder(i)?.csa_id === myCsaId),
         ),
         depotOrders: (depotOrders.data ?? []).filter(
           (o) => !myCsaId || (o.csa_id as string | null) === myCsaId,
@@ -132,14 +180,15 @@ function CsaPage() {
     },
   });
 
-
   const { data: parties } = useQuery({
     queryKey: ["parties", myCsaId],
     queryFn: () => fetchParties(myCsaId),
   });
   const ledgerParties = (parties ?? [])
     .filter((p) => p.type === "distributor")
-    .filter((p) => !ledgerSearch || p.name.toLowerCase().includes(ledgerSearch.trim().toLowerCase()));
+    .filter(
+      (p) => !ledgerSearch || p.name.toLowerCase().includes(ledgerSearch.trim().toLowerCase()),
+    );
 
   const orders = data?.orders ?? [];
   const pending = orders.filter((o) => o.status === "pending");
@@ -161,7 +210,10 @@ function CsaPage() {
     });
   })();
 
-  const totalDepotBilled = (data?.purchaseInvoices ?? []).reduce((s, i) => s + Number(i.net_amount), 0);
+  const totalDepotBilled = (data?.purchaseInvoices ?? []).reduce(
+    (s, i) => s + Number(i.net_amount),
+    0,
+  );
   const totalApprovedPaid = (outgoingPayments ?? [])
     .filter((p) => p.status === "approved")
     .reduce((s, p) => s + Number(p.amount), 0);
@@ -170,26 +222,53 @@ function CsaPage() {
     .reduce((s, p) => s + Number(p.amount), 0);
   const netDepotPayable = Math.max(0, totalDepotBilled - totalApprovedPaid);
 
+  const inTransitDepotOrders = (data?.depotOrders ?? []).filter((o) => o.status === "dispatched");
+
   return (
     <Shell title="CSA / Super Stockist" subtitle="Distributor orders • stock • dispatch">
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 md:grid-cols-4">
-        <StatCard label="Pending Orders" value={String(pending.length)} tone="warning" onClick={() => navigate({ to: "/csa-report/$card", params: { card: "pending" } })} />
-        <StatCard label="Distributors" value={String(data?.distributors.length ?? 0)} onClick={() => navigate({ to: "/csa-report/$card", params: { card: "distributors" } })} />
-        <StatCard label="Stock Value" value={compactInr(stockValue)} tone="success" onClick={() => navigate({ to: "/csa-report/$card", params: { card: "stock" } })} />
-        <StatCard label="Outstanding" value={compactInr(outstanding)} tone="danger" onClick={() => navigate({ to: "/csa-report/$card", params: { card: "outstanding" } })} />
+        <StatCard
+          label="Pending Orders"
+          value={String(pending.length)}
+          tone="warning"
+          onClick={() => navigate({ to: "/csa-report/$card", params: { card: "pending" } })}
+        />
+        <StatCard
+          label="Distributors"
+          value={String(data?.distributors.length ?? 0)}
+          onClick={() => navigate({ to: "/csa-report/$card", params: { card: "distributors" } })}
+        />
+        <StatCard
+          label="Stock Value"
+          value={compactInr(stockValue)}
+          tone="success"
+          onClick={() => navigate({ to: "/csa-report/$card", params: { card: "stock" } })}
+        />
+        <StatCard
+          label="Outstanding"
+          value={compactInr(outstanding)}
+          tone="danger"
+          onClick={() => navigate({ to: "/csa-report/$card", params: { card: "outstanding" } })}
+        />
       </div>
 
       <Tabs defaultValue="orders" className="mt-6">
         <TabsList>
           <TabsTrigger value="orders">Distributor Orders</TabsTrigger>
-          <TabsTrigger value="depot">Depot Purchase</TabsTrigger>
+          <TabsTrigger value="depot">
+            Depot Purchase
+            {inTransitDepotOrders.length ? ` (${inTransitDepotOrders.length} In-Transit)` : ""}
+          </TabsTrigger>
           <TabsTrigger value="godown">Godown Billing</TabsTrigger>
 
           <TabsTrigger value="stock">CSA Stock</TabsTrigger>
           <TabsTrigger value="invoices">Sales Invoices</TabsTrigger>
           <TabsTrigger value="purchaseinv">Purchase Invoices</TabsTrigger>
 
-          <TabsTrigger value="delivery">Delivery Status</TabsTrigger>
+          <TabsTrigger value="delivery">
+            Delivery Status
+            {inTransitDepotOrders.length ? ` (${inTransitDepotOrders.length} Incoming)` : ""}
+          </TabsTrigger>
           <TabsTrigger value="paymentin">
             Payment In{pendingPayments.length ? ` (${pendingPayments.length})` : ""}
           </TabsTrigger>
@@ -225,12 +304,17 @@ function CsaPage() {
                         {o.order_no} • {(o.distributors as { name: string } | null)?.name}
                       </p>
                       <p className="text-[11px] text-muted-foreground">
-                        {(o.order_items ?? []).length} SKU • {new Date(o.created_at).toLocaleDateString("en-IN")}
+                        {(o.order_items ?? []).length} SKU •{" "}
+                        {new Date(o.created_at).toLocaleDateString("en-IN")}
                       </p>
                     </div>
                     <div className="flex shrink-0 items-center gap-3">
-                      <span className="text-sm font-semibold tabular-nums">{inr(o.total_amount)}</span>
-                      <Badge variant={o.status === "pending" ? "default" : "secondary"}>{o.status}</Badge>
+                      <span className="text-sm font-semibold tabular-nums">
+                        {inr(o.total_amount)}
+                      </span>
+                      <Badge variant={o.status === "pending" ? "default" : "secondary"}>
+                        {o.status}
+                      </Badge>
                     </div>
                   </Link>
                 ))
@@ -253,19 +337,71 @@ function CsaPage() {
                 <p className="p-4 text-sm text-muted-foreground">No depot orders yet.</p>
               ) : (
                 (data?.depotOrders ?? []).map((o) => (
-                  <div key={o.id} className="flex items-center justify-between gap-3 p-3 text-sm">
-                    <div className="min-w-0">
-                      <p className="truncate font-medium">
-                        {o.order_no} • {(o.depots as { name: string } | null)?.name ?? "Master Depot"}
-                      </p>
-                      <p className="text-[11px] text-muted-foreground">
-                        {(o.order_items ?? []).length} SKU • {new Date(o.created_at).toLocaleDateString("en-IN")}
-                      </p>
+                  <div key={o.id} className="space-y-2 p-3 text-sm">
+                    <div className="flex items-center justify-between gap-3">
+                      <div className="min-w-0">
+                        <p className="truncate font-medium">
+                          {o.order_no} •{" "}
+                          {(o.depots as { name: string } | null)?.name ?? "Master Depot"}
+                        </p>
+                        <p className="text-[11px] text-muted-foreground">
+                          {(o.order_items ?? []).length} SKU •{" "}
+                          {new Date(o.created_at).toLocaleDateString("en-IN")}
+                          {o.notes ? ` • ${o.notes}` : ""}
+                        </p>
+                      </div>
+                      <div className="flex shrink-0 items-center gap-3">
+                        <span className="font-semibold tabular-nums">{inr(o.total_amount)}</span>
+                        <Badge
+                          variant={
+                            o.status === "dispatched"
+                              ? "default"
+                              : o.status === "delivered"
+                                ? "secondary"
+                                : o.status === "pending"
+                                  ? "outline"
+                                  : "destructive"
+                          }
+                        >
+                          {o.status === "dispatched" ? "In-Transit" : o.status}
+                        </Badge>
+                      </div>
                     </div>
-                    <div className="flex shrink-0 items-center gap-3">
-                      <span className="font-semibold tabular-nums">{inr(o.total_amount)}</span>
-                      <Badge variant={o.status === "pending" ? "default" : "secondary"}>{o.status}</Badge>
-                    </div>
+
+                    {o.status === "dispatched" ? (
+                      <div className="flex flex-wrap items-center justify-between gap-2 rounded-md bg-muted/40 p-2.5">
+                        <div className="min-w-0">
+                          <p className="text-xs font-medium text-primary">
+                            Consignment in transit from Master Depot
+                          </p>
+                          <p className="text-[11px] text-muted-foreground">
+                            Stock is reserved until you physically receive and accept the delivery
+                            at your warehouse.
+                          </p>
+                        </div>
+                        <div className="flex gap-2">
+                          <Button
+                            size="sm"
+                            disabled={receiveDepotOrder.isPending}
+                            onClick={() =>
+                              receiveDepotOrder.mutate({ orderId: o.id, accept: true })
+                            }
+                          >
+                            Accept Stock
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            disabled={receiveDepotOrder.isPending}
+                            onClick={() =>
+                              receiveDepotOrder.mutate({ orderId: o.id, accept: false })
+                            }
+                          >
+                            Reject
+                          </Button>
+                        </div>
+                      </div>
+                    ) : null}
                   </div>
                 ))
               )}
@@ -290,10 +426,12 @@ function CsaPage() {
                   <div key={o.id} className="flex items-center justify-between gap-3 p-3 text-sm">
                     <div className="min-w-0">
                       <p className="truncate font-medium">
-                        {o.order_no} • {(o.distributors as { name: string } | null)?.name ?? "Party"}
+                        {o.order_no} •{" "}
+                        {(o.distributors as { name: string } | null)?.name ?? "Party"}
                       </p>
                       <p className="text-[11px] text-muted-foreground">
-                        {(o.order_items ?? []).length} SKU • {new Date(o.created_at).toLocaleDateString("en-IN")}
+                        {(o.order_items ?? []).length} SKU •{" "}
+                        {new Date(o.created_at).toLocaleDateString("en-IN")}
                       </p>
                     </div>
                     <div className="flex shrink-0 items-center gap-3">
@@ -308,7 +446,6 @@ function CsaPage() {
         </TabsContent>
 
         <TabsContent value="stock">
-
           <Section
             title="Warehouse Stock"
             action={
@@ -332,7 +469,9 @@ function CsaPage() {
             <div className="divide-y divide-border/60">
               {filteredStock.length === 0 ? (
                 <p className="p-3 text-sm text-muted-foreground">
-                  {stockSearch ? "No matching stock found." : "No stock yet — add opening stock first."}
+                  {stockSearch
+                    ? "No matching stock found."
+                    : "No stock yet — add opening stock first."}
                 </p>
               ) : (
                 filteredStock.map((s) => {
@@ -341,9 +480,15 @@ function CsaPage() {
                   return (
                     <div key={s.id} className="flex items-center justify-between p-3 text-sm">
                       <span>
-                        {csaName ? <span className="mr-2 text-xs font-semibold text-primary/70">[{csaName}]</span> : null}
+                        {csaName ? (
+                          <span className="mr-2 text-xs font-semibold text-primary/70">
+                            [{csaName}]
+                          </span>
+                        ) : null}
                         {p?.name}
-                        {p?.sku ? <span className="ml-2 text-xs text-muted-foreground">{p.sku}</span> : null}
+                        {p?.sku ? (
+                          <span className="ml-2 text-xs text-muted-foreground">{p.sku}</span>
+                        ) : null}
                       </span>
                       <span className="tabular-nums">{s.physical_qty - s.reserved_qty} pcs</span>
                     </div>
@@ -351,19 +496,43 @@ function CsaPage() {
                 })
               )}
             </div>
-
           </Section>
         </TabsContent>
 
-        <TabsContent value="delivery">
-          <DeliveryList
-            mode="csa"
-            action={
-              <Button asChild size="sm">
-                <Link to="/delivery-note" search={{ order: undefined }}>Add LR / dispatch</Link>
-              </Button>
-            }
-          />
+        <TabsContent value="delivery" className="space-y-4">
+          <Tabs defaultValue="incoming">
+            <TabsList className="grid w-full grid-cols-2 sm:w-auto">
+              <TabsTrigger value="incoming" className="gap-1.5 text-xs sm:text-sm">
+                <span>📥 डिपो से आने वाला माल</span>
+                {inTransitDepotOrders.length > 0 && (
+                  <Badge variant="default" className="ml-1 h-5 px-1.5 text-[10px]">
+                    {inTransitDepotOrders.length}
+                  </Badge>
+                )}
+              </TabsTrigger>
+              <TabsTrigger value="outgoing" className="gap-1.5 text-xs sm:text-sm">
+                <span>📤 डिस्ट्रीब्यूटर को भेजा माल</span>
+              </TabsTrigger>
+            </TabsList>
+
+            <TabsContent value="incoming" className="mt-4">
+              <DeliveryList mode="csa-incoming" csaId={myCsaId} />
+            </TabsContent>
+
+            <TabsContent value="outgoing" className="mt-4">
+              <DeliveryList
+                mode="csa"
+                csaId={myCsaId}
+                action={
+                  <Button asChild size="sm">
+                    <Link to="/delivery-note" search={{ order: undefined }}>
+                      Add LR / dispatch
+                    </Link>
+                  </Button>
+                }
+              />
+            </TabsContent>
+          </Tabs>
         </TabsContent>
 
         <TabsContent value="invoices">
@@ -377,14 +546,24 @@ function CsaPage() {
                     order_no: string;
                     csa_id: string | null;
                     distributors: Record<string, string | null> | null;
-                    order_items: { id: string; qty: number; free_qty: number; rate: number; amount: number; products: { name: string } | null }[] | null;
+                    order_items:
+                      | {
+                          id: string;
+                          qty: number;
+                          free_qty: number;
+                          rate: number;
+                          amount: number;
+                          products: { name: string } | null;
+                        }[]
+                      | null;
                   } | null;
                   return (
                     <div key={i.id} className="flex items-center justify-between gap-3 p-3 text-sm">
                       <div>
                         <p className="font-medium">{i.invoice_no}</p>
                         <p className="text-[11px] text-muted-foreground">
-                          {ord?.order_no} • {ord?.distributors?.['name']} • CGST {inr(i.cgst)} • SGST {inr(i.sgst)}
+                          {ord?.order_no} • {ord?.distributors?.["name"]} • CGST {inr(i.cgst)} •
+                          SGST {inr(i.sgst)}
                         </p>
                       </div>
                       <div className="flex items-center gap-2">
@@ -402,14 +581,20 @@ function CsaPage() {
                                 "Super Stockist",
                               ),
                               buyer: toParty(ord?.distributors, "Distributor", "Distributor"),
-                              shipTo: toParty(ord?.distributors, "Distributor (Consignee)", "Distributor"),
+                              shipTo: toParty(
+                                ord?.distributors,
+                                "Distributor (Consignee)",
+                                "Distributor",
+                              ),
                               orderNo: ord?.order_no ?? null,
                               lines: (ord?.order_items ?? []).map((it) => ({
                                 name: it.products?.name ?? "Item",
                                 qty: it.qty,
                                 freeQty: it.free_qty,
                                 rate: Number(it.rate),
-                                amount: Number(it.amount), hsn: (it.products as any)?.hsn, mrp: (it.products as any)?.mrp,
+                                amount: Number(it.amount),
+                                hsn: (it.products as any)?.hsn,
+                                mrp: (it.products as any)?.mrp,
                               })),
                               discountAmount: Number((ord as any)?.discount_amount) || undefined,
                               taxable: Number(i.taxable_value),
@@ -442,7 +627,14 @@ function CsaPage() {
                     csa_id: string | null;
                     depots: Record<string, string | null> | null;
                     order_items:
-                      | { id: string; qty: number; free_qty: number; rate: number; amount: number; products: { name: string } | null }[]
+                      | {
+                          id: string;
+                          qty: number;
+                          free_qty: number;
+                          rate: number;
+                          amount: number;
+                          products: { name: string } | null;
+                        }[]
                       | null;
                   } | null;
                   return (
@@ -450,7 +642,8 @@ function CsaPage() {
                       <div className="min-w-0">
                         <p className="font-medium">{i.invoice_no}</p>
                         <p className="truncate text-[11px] text-muted-foreground">
-                          {ord?.order_no} • {ord?.depots?.['name'] ?? "Master Depot"} • CGST {inr(i.cgst)} • SGST {inr(i.sgst)}
+                          {ord?.order_no} • {ord?.depots?.["name"] ?? "Master Depot"} • CGST{" "}
+                          {inr(i.cgst)} • SGST {inr(i.sgst)}
                         </p>
                       </div>
                       <div className="flex shrink-0 items-center gap-2">
@@ -479,7 +672,9 @@ function CsaPage() {
                                 qty: it.qty,
                                 freeQty: it.free_qty,
                                 rate: Number(it.rate),
-                                amount: Number(it.amount), hsn: (it.products as any)?.hsn, mrp: (it.products as any)?.mrp,
+                                amount: Number(it.amount),
+                                hsn: (it.products as any)?.hsn,
+                                mrp: (it.products as any)?.mrp,
                               })),
                               discountAmount: Number((ord as any)?.discount_amount) || undefined,
                               taxable: Number(i.taxable_value),
@@ -505,7 +700,9 @@ function CsaPage() {
             title="Payments from Distributors"
             action={
               <Button asChild size="sm">
-                <Link to="/payment-in" search={{ partyId: "" }}>Manual Payment In</Link>
+                <Link to="/payment-in" search={{ partyId: "" }}>
+                  Manual Payment In
+                </Link>
               </Button>
             }
           >
@@ -524,13 +721,19 @@ function CsaPage() {
                           {new Date(p.created_at).toLocaleDateString("en-IN")} • {p.mode}
                           {p.reference ? ` • ${p.reference}` : ""} • entered by {p.created_role}
                         </p>
-                        {p.notes ? <p className="text-[11px] text-muted-foreground">Remark: {p.notes}</p> : null}
+                        {p.notes ? (
+                          <p className="text-[11px] text-muted-foreground">Remark: {p.notes}</p>
+                        ) : null}
                       </div>
                       <div className="text-right">
                         <p className="font-semibold tabular-nums text-success">{inr(p.amount)}</p>
                         <Badge
                           variant={
-                            p.status === "approved" ? "default" : p.status === "rejected" ? "destructive" : "secondary"
+                            p.status === "approved"
+                              ? "default"
+                              : p.status === "rejected"
+                                ? "destructive"
+                                : "secondary"
                           }
                         >
                           {p.status}
@@ -587,15 +790,21 @@ function CsaPage() {
               </div>
               <div className="rounded border bg-background p-2.5">
                 <p className="text-[11px] text-muted-foreground">Paid & Approved</p>
-                <p className="text-sm font-semibold tabular-nums text-success">{inr(totalApprovedPaid)}</p>
+                <p className="text-sm font-semibold tabular-nums text-success">
+                  {inr(totalApprovedPaid)}
+                </p>
               </div>
               <div className="rounded border bg-background p-2.5">
                 <p className="text-[11px] text-muted-foreground">Pending Approval</p>
-                <p className="text-sm font-semibold tabular-nums text-amber-600">{inr(totalPendingPaid)}</p>
+                <p className="text-sm font-semibold tabular-nums text-amber-600">
+                  {inr(totalPendingPaid)}
+                </p>
               </div>
               <div className="rounded border bg-background p-2.5">
                 <p className="text-[11px] text-muted-foreground">Net Balance Payable</p>
-                <p className="text-sm font-semibold tabular-nums text-destructive">{inr(netDepotPayable)}</p>
+                <p className="text-sm font-semibold tabular-nums text-destructive">
+                  {inr(netDepotPayable)}
+                </p>
               </div>
             </div>
 
@@ -605,7 +814,8 @@ function CsaPage() {
             <div className="divide-y divide-border/60">
               {(outgoingPayments ?? []).length === 0 ? (
                 <p className="p-4 text-sm text-muted-foreground">
-                  No outgoing payments recorded yet. Click &quot;Record Payment Out&quot; above to submit a payment to Master Depot.
+                  No outgoing payments recorded yet. Click &quot;Record Payment Out&quot; above to
+                  submit a payment to Master Depot.
                 </p>
               ) : (
                 (outgoingPayments ?? []).map((p) => (
@@ -627,15 +837,15 @@ function CsaPage() {
                           p.status === "approved"
                             ? "default"
                             : p.status === "rejected"
-                            ? "destructive"
-                            : "secondary"
+                              ? "destructive"
+                              : "secondary"
                         }
                       >
                         {p.status === "pending"
                           ? "Pending Depot"
                           : p.status === "approved"
-                          ? "Approved"
-                          : "Rejected"}
+                            ? "Approved"
+                            : "Rejected"}
                       </Badge>
                     </div>
                   </div>
@@ -652,14 +862,18 @@ function CsaPage() {
                 <>
                   <div className="flex items-center justify-between gap-3 bg-muted/40 p-3 text-sm">
                     <span className="font-medium">Total Invoiced Amount</span>
-                    <span className="font-semibold tabular-nums">
-                      {inr(totalDepotBilled)}
-                    </span>
+                    <span className="font-semibold tabular-nums">{inr(totalDepotBilled)}</span>
                   </div>
                   {(data?.purchaseInvoices ?? []).map((i) => {
-                    const o = i.orders as { order_no: string; depots: { name: string } | null } | null;
+                    const o = i.orders as {
+                      order_no: string;
+                      depots: { name: string } | null;
+                    } | null;
                     return (
-                      <div key={i.id} className="flex items-center justify-between gap-3 p-3 text-sm">
+                      <div
+                        key={i.id}
+                        className="flex items-center justify-between gap-3 p-3 text-sm"
+                      >
                         <div className="min-w-0">
                           <p className="truncate font-medium">{i.invoice_no}</p>
                           <p className="text-[11px] text-muted-foreground">
@@ -667,7 +881,9 @@ function CsaPage() {
                             {new Date(i.created_at).toLocaleDateString("en-IN")}
                           </p>
                         </div>
-                        <span className="shrink-0 font-semibold tabular-nums">{inr(i.net_amount)}</span>
+                        <span className="shrink-0 font-semibold tabular-nums">
+                          {inr(i.net_amount)}
+                        </span>
                       </div>
                     );
                   })}
@@ -678,7 +894,11 @@ function CsaPage() {
         </TabsContent>
 
         <TabsContent value="margin">
-          <MarginBudget csaIds={myCsaId ? [myCsaId] : null} distributorIds={[]} title="My margin budget" />
+          <MarginBudget
+            csaIds={myCsaId ? [myCsaId] : null}
+            distributorIds={[]}
+            title="My margin budget"
+          />
         </TabsContent>
 
         <TabsContent value="ledger">
@@ -693,7 +913,12 @@ function CsaPage() {
             <div className="p-3">
               <div className="relative">
                 <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-                <Input value={ledgerSearch} onChange={(e) => setLedgerSearch(e.target.value)} placeholder="Search distributor..." className="pl-9 h-9" />
+                <Input
+                  value={ledgerSearch}
+                  onChange={(e) => setLedgerSearch(e.target.value)}
+                  placeholder="Search distributor..."
+                  className="pl-9 h-9"
+                />
               </div>
             </div>
             <div className="divide-y divide-border/60">
