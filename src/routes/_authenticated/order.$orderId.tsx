@@ -83,16 +83,45 @@ function OrderDetailPage() {
 
   const save = useMutation({
     mutationFn: async () => {
+      const distId = order?.distributor_id;
       for (const it of items) {
-        const q = Number(qty[it.id] ?? it.qty) || 0;
-        const amount = q * Number(it.rate);
-        if (q <= 0) {
+        const oldQ = Number(it.qty) || 0;
+        const newQ = Number(qty[it.id] ?? it.qty) || 0;
+        const diff = oldQ - newQ;
+        const amount = newQ * Number(it.rate);
+
+        if (newQ <= 0) {
           const { error } = await supabase.from("order_items").delete().eq("id", it.id);
           if (error) throw error;
-          continue;
+        } else {
+          const { error } = await supabase.from("order_items").update({ qty: newQ, amount }).eq("id", it.id);
+          if (error) throw error;
         }
-        const { error } = await supabase.from("order_items").update({ qty: q, amount }).eq("id", it.id);
-        if (error) throw error;
+
+        // Adjust reserved stock if quantity was edited on a pending order
+        if (order?.status === "pending" && distId && diff !== 0) {
+          const { data: curStock } = await supabase
+            .from("distributor_stock")
+            .select("id, reserved_qty")
+            .eq("distributor_id", distId)
+            .eq("product_id", it.product_id)
+            .maybeSingle();
+
+          if (curStock) {
+            const nextReserved =
+              diff > 0
+                ? Math.max(0, Number(curStock.reserved_qty || 0) - diff)
+                : Number(curStock.reserved_qty || 0) + Math.abs(diff);
+
+            await supabase
+              .from("distributor_stock")
+              .update({
+                reserved_qty: nextReserved,
+                updated_at: new Date().toISOString(),
+              })
+              .eq("id", curStock.id);
+          }
+        }
       }
       const { error } = await supabase
         .from("orders")
@@ -111,13 +140,41 @@ function OrderDetailPage() {
   const act = useMutation({
     mutationFn: async ({ accept }: { accept: boolean }) => {
       if (!order) throw new Error("Order not found");
-      await save.mutateAsync();
+      const distId = order.distributor_id;
+      if (!distId) throw new Error("Order has no distributor mapped");
 
       if (!accept) {
+        // Release reserved stock back to available inventory on reject
+        if (order.status === "pending") {
+          for (const it of items) {
+            const releaseQty = (Number(it.qty) || 0) + (Number(it.free_qty) || 0);
+            if (releaseQty <= 0) continue;
+
+            const { data: curStock } = await supabase
+              .from("distributor_stock")
+              .select("id, reserved_qty")
+              .eq("distributor_id", distId)
+              .eq("product_id", it.product_id)
+              .maybeSingle();
+
+            if (curStock) {
+              await supabase
+                .from("distributor_stock")
+                .update({
+                  reserved_qty: Math.max(0, Number(curStock.reserved_qty || 0) - releaseQty),
+                  updated_at: new Date().toISOString(),
+                })
+                .eq("id", curStock.id);
+            }
+          }
+        }
+
         const { error } = await supabase.from("orders").update({ status: "rejected" }).eq("id", orderId);
         if (error) throw error;
         return;
       }
+
+      await save.mutateAsync();
 
       const { taxable, cgst, sgst, net } = gstBreakup(newTotal);
       const { error: invError } = await supabase
@@ -128,19 +185,25 @@ function OrderDetailPage() {
       for (const it of items) {
         const q = Number(qty[it.id] ?? it.qty) || 0;
         if (q <= 0) continue;
-        const row = (data?.stock ?? []).find(
-          (s) => s.product_id === it.product_id && s.distributor_id === order.distributor_id,
-        );
-        if (!row) continue;
-        const shipped = q + it.free_qty;
-        await supabase
+        const shipped = q + (Number(it.free_qty) || 0);
+
+        const { data: curStock } = await supabase
           .from("distributor_stock")
-          .update({
-            physical_qty: Math.max(0, row.physical_qty - shipped),
-            reserved_qty: Math.max(0, row.reserved_qty - shipped),
-            updated_at: new Date().toISOString(),
-          })
-          .eq("id", row.id);
+          .select("id, physical_qty, reserved_qty")
+          .eq("distributor_id", distId)
+          .eq("product_id", it.product_id)
+          .maybeSingle();
+
+        if (curStock) {
+          await supabase
+            .from("distributor_stock")
+            .update({
+              physical_qty: Math.max(0, Number(curStock.physical_qty || 0) - shipped),
+              reserved_qty: Math.max(0, Number(curStock.reserved_qty || 0) - shipped),
+              updated_at: new Date().toISOString(),
+            })
+            .eq("id", curStock.id);
+        }
       }
 
       const { error } = await supabase.from("orders").update({ status: "invoiced" }).eq("id", orderId);

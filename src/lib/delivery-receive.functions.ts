@@ -164,6 +164,26 @@ export const receiveDeliveryServerFn = createServerFn({ method: "POST" })
                 updated_at: new Date().toISOString(),
               })
               .eq("id", distRow.id);
+
+            // Return stock back to CSA warehouse
+            if (order.csa_id) {
+              const { data: csaRow } = await supabase
+                .from("csa_stock")
+                .select("*")
+                .eq("csa_id", order.csa_id)
+                .eq("product_id", it.product_id)
+                .maybeSingle();
+
+              if (csaRow) {
+                await supabase
+                  .from("csa_stock")
+                  .update({
+                    physical_qty: Number(csaRow.physical_qty || 0) + totalQty,
+                    updated_at: new Date().toISOString(),
+                  })
+                  .eq("id", csaRow.id);
+              }
+            }
           }
         }
       }

@@ -166,20 +166,30 @@ function DistributorPage() {
       });
       if (invError) throw invError;
 
+      const distId = order.distributor_id ?? myDistributorId;
+      if (!distId) throw new Error("Order has no distributor mapped");
+
       for (const item of order.order_items ?? []) {
-        const row = data?.stock.find(
-          (s) => s.product_id === item.product_id && s.distributor_id === order.distributor_id,
-        );
-        if (!row) continue;
-        const shipped = item.qty + item.free_qty;
-        await supabase
+        const shipped = (Number(item.qty) || 0) + (Number(item.free_qty) || 0);
+        if (shipped <= 0) continue;
+
+        const { data: curStock } = await supabase
           .from("distributor_stock")
-          .update({
-            physical_qty: Math.max(0, row.physical_qty - shipped),
-            reserved_qty: Math.max(0, row.reserved_qty - shipped),
-            updated_at: new Date().toISOString(),
-          })
-          .eq("id", row.id);
+          .select("id, physical_qty, reserved_qty")
+          .eq("distributor_id", distId)
+          .eq("product_id", item.product_id)
+          .maybeSingle();
+
+        if (curStock) {
+          await supabase
+            .from("distributor_stock")
+            .update({
+              physical_qty: Math.max(0, Number(curStock.physical_qty || 0) - shipped),
+              reserved_qty: Math.max(0, Number(curStock.reserved_qty || 0) - shipped),
+              updated_at: new Date().toISOString(),
+            })
+            .eq("id", curStock.id);
+        }
       }
 
       const { error } = await supabase.from("orders").update({ status: "invoiced" }).eq("id", orderId);
@@ -190,6 +200,43 @@ function DistributorPage() {
   const act = useMutation({
     mutationFn: async ({ orderId, accept }: { orderId: string; accept: boolean }) => {
       if (!accept) {
+        // Release reserved stock back to available inventory
+        const order = data?.orders.find((o) => o.id === orderId);
+        const distId = order?.distributor_id ?? myDistributorId;
+
+        const { data: orderData } = await supabase
+          .from("orders")
+          .select("distributor_id, status, order_items(product_id, qty, free_qty)")
+          .eq("id", orderId)
+          .single();
+
+        const targetDistId = orderData?.distributor_id ?? distId;
+        const itemsToRelease = orderData?.order_items ?? order?.order_items ?? [];
+
+        if (targetDistId && orderData?.status === "pending") {
+          for (const item of itemsToRelease) {
+            const releaseQty = (Number(item.qty) || 0) + (Number(item.free_qty) || 0);
+            if (releaseQty <= 0) continue;
+
+            const { data: curStock } = await supabase
+              .from("distributor_stock")
+              .select("id, reserved_qty")
+              .eq("distributor_id", targetDistId)
+              .eq("product_id", item.product_id)
+              .maybeSingle();
+
+            if (curStock) {
+              await supabase
+                .from("distributor_stock")
+                .update({
+                  reserved_qty: Math.max(0, Number(curStock.reserved_qty || 0) - releaseQty),
+                  updated_at: new Date().toISOString(),
+                })
+                .eq("id", curStock.id);
+            }
+          }
+        }
+
         const { error } = await supabase.from("orders").update({ status: "rejected" }).eq("id", orderId);
         if (error) throw error;
         return;
