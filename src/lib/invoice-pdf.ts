@@ -1,4 +1,4 @@
-import { inr, exactInr } from "@/lib/sfa";
+import { exactInr } from "@/lib/sfa";
 import { getLogoDataUrl } from "@/lib/brand-logo";
 
 export type InvoicePdfLine = {
@@ -39,7 +39,19 @@ export type InvoicePdfData = {
   net: number;
 };
 
-const money = (n: number) => inr(n).replace("₹", "Rs. ");
+const formatAmount = (n: number | null | undefined): string => {
+  const num = Number(n ?? 0);
+  return Math.abs(num).toLocaleString("en-IN", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
+};
+
+const money = (n: number): string => {
+  const num = Number(n ?? 0);
+  const formatted = formatAmount(num);
+  return num < 0 ? `-Rs. ${formatted}` : `Rs. ${formatted}`;
+};
 
 function sellerLines(p: InvoiceParty): string[] {
   const out: string[] = [p.name];
@@ -171,7 +183,7 @@ export async function downloadInvoicePdf(data: InvoicePdfData) {
     doc.text((l.hsn || "-").slice(0, 10), 320, y, { align: "right" });
     doc.text(l.mrp ? exactInr(l.mrp).replace("₹", "") : "-", 375, y, { align: "right" });
     doc.text(String(l.qty), 425, y, { align: "right" });
-    doc.text(exactInr(l.rate).replace("₹", ""), 485, y, { align: "right" });
+    doc.text(formatAmount(l.rate), 485, y, { align: "right" });
     doc.text(money(l.amount), W - 40, y, { align: "right" });
   }
 
