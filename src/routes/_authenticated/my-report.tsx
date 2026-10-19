@@ -65,7 +65,7 @@ function MyReportPage() {
     queryKey: ["my-report", month, userId],
     enabled: !!userId,
     queryFn: async () => {
-      const [orders, profiles, attendance, expenses, salary, targets, collections] = await Promise.all([
+      const [orders, profiles, assignments, attendance, expenses, salary, targets, collections] = await Promise.all([
         supabase
           .from("orders")
           .select(
@@ -73,7 +73,8 @@ function MyReportPage() {
           )
           .gte("created_at", range.from)
           .lt("created_at", range.to),
-        supabase.from("profiles").select("id, full_name, employee_code, designation"),
+        supabase.from("profiles").select("id, full_name, employee_code, designation, reports_to, distributor_id, csa_id"),
+        supabase.from("manager_assignments").select("manager_id, distributor_id, csa_id, member_id"),
         supabase
           .from("attendance")
           .select("work_date, punch_in, punch_out, location_label")
@@ -102,6 +103,7 @@ function MyReportPage() {
       return {
         orders: orders.data ?? [],
         profiles: profiles.data ?? [],
+        assignments: assignments.data ?? [],
         attendance: attendance.data ?? [],
         expenses: expenses.data ?? [],
         salary: salary.data ?? null,
@@ -115,6 +117,47 @@ function MyReportPage() {
   const myOrders = allOrders.filter((o) => o.salesman_id === userId);
   const mySales = sum(myOrders.map((o) => Number(o.total_amount)));
   const nameOf = new Map((data?.profiles ?? []).map((p) => [p.id, p.full_name]));
+
+  const teamIds = useMemo(() => {
+    const allProfiles = data?.profiles ?? [];
+    const allAssignments = data?.assignments ?? [];
+    const set = new Set<string>();
+    if (!userId) return set;
+
+    const isAdmin = me?.roles?.some((r) => r === "admin" || r === "super_admin");
+    if (isAdmin) {
+      allProfiles.forEach((p) => set.add(p.id));
+      return set;
+    }
+
+    const downline = new Set<string>([userId]);
+    let grew = true;
+    while (grew) {
+      grew = false;
+      allProfiles.forEach((p) => {
+        if (p.reports_to && downline.has(p.reports_to) && !downline.has(p.id)) {
+          downline.add(p.id);
+          grew = true;
+        }
+      });
+    }
+
+    const assignments = allAssignments.filter((a) => a.manager_id && downline.has(a.manager_id));
+    const distIds = new Set(assignments.map((a) => a.distributor_id).filter(Boolean) as string[]);
+    const csaIds = new Set(assignments.map((a) => a.csa_id).filter(Boolean) as string[]);
+
+    downline.forEach((id) => set.add(id));
+    assignments.forEach((a) => {
+      if (a.member_id) set.add(a.member_id);
+    });
+    allProfiles.forEach((p) => {
+      if ((p.distributor_id && distIds.has(p.distributor_id)) || (p.csa_id && csaIds.has(p.csa_id))) {
+        set.add(p.id);
+      }
+    });
+
+    return set;
+  }, [data?.profiles, data?.assignments, userId, me?.roles]);
 
   const group = (rows: typeof allOrders, key: (o: (typeof allOrders)[number]) => string) => {
     const map = new Map<string, { value: number; orders: number }>();
@@ -132,7 +175,8 @@ function MyReportPage() {
   const byCity = group(myOrders, (o) => o.retailers?.city ?? "Unknown");
   const byDistributor = group(myOrders, (o) => o.retailers?.distributors?.name ?? "Unmapped");
   const byOutlet = group(myOrders, (o) => o.retailers?.name ?? "Unknown");
-  const bySalesman = group(allOrders.filter((o) => o.salesman_id), (o) => nameOf.get(o.salesman_id!) ?? "Unknown");
+  const teamOrders = allOrders.filter((o) => o.salesman_id && teamIds.has(o.salesman_id));
+  const bySalesman = group(teamOrders, (o) => nameOf.get(o.salesman_id!) ?? "Unknown");
 
   const attendance = data?.attendance ?? [];
   const presentDays = attendance.filter((a) => a.punch_in).length;
