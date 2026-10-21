@@ -1,7 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useMappedDistributors } from "@/hooks/useMappedDistributors";
-import { useMappedCsas } from "@/hooks/useMappedCsas";
 import { Section } from "@/components/sfa/Shell";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -12,55 +11,32 @@ import { downloadReportPdf } from "@/lib/report-pdf";
 
 export function SalesmanStockReport() {
   const { data: mappedDistributors = [] } = useMappedDistributors();
-  const { data: mappedCsas = [] } = useMappedCsas();
   const [q, setQ] = useState("");
   const [selectedLoc, setSelectedLoc] = useState("all");
 
   const locationOptions = useMemo(() => {
-    const opts: string[] = [];
-    mappedDistributors.forEach(d => opts.push(`${d.name} (Distributor)`));
-    mappedCsas.forEach(c => opts.push(`${c.name} (CSA)`));
-    return opts;
-  }, [mappedDistributors, mappedCsas]);
+    return mappedDistributors.map((d) => d.name);
+  }, [mappedDistributors]);
 
   const distIds = mappedDistributors.map((d) => d.id);
-  const csaIds = mappedCsas.map((c) => c.id);
 
   const { data: stock = [], isLoading } = useQuery({
-    queryKey: ["salesman-stock", distIds, csaIds],
-    enabled: true, // Only fetch if there's no error in mapping. It handles empty lists on backend anyway.
+    queryKey: ["salesman-stock", distIds],
+    enabled: true,
     queryFn: async () => {
-      const [dStock, cStock] = await Promise.all([
-        distIds.length
-          ? supabase
-              .from("distributor_stock")
-              .select("physical_qty, products(name, sku), distributors(name)")
-              .in("distributor_id", distIds)
-          : Promise.resolve({ data: [] }),
-        csaIds.length
-          ? supabase
-              .from("csa_stock")
-              .select("physical_qty, products(name, sku), csas(name)")
-              .in("csa_id", csaIds)
-          : Promise.resolve({ data: [] }),
-      ]);
+      if (!distIds.length) return [];
+      const { data: dStock } = await supabase
+        .from("distributor_stock")
+        .select("physical_qty, products(name, sku), distributors(name)")
+        .in("distributor_id", distIds);
 
       const rows: { product: string; sku: string; location: string; qty: number }[] = [];
 
-      for (const row of dStock.data ?? []) {
+      for (const row of dStock ?? []) {
         rows.push({
           product: (row.products as { name?: string } | null)?.name ?? "Unknown",
           sku: (row.products as { sku?: string } | null)?.sku ?? "",
-          location: `${(row.distributors as { name?: string } | null)?.name ?? "Unknown"} (Distributor)`,
-          qty: row.physical_qty,
-        });
-      }
-
-      for (const row of cStock.data ?? []) {
-        rows.push({
-          product: (row.products as { name?: string } | null)?.name ?? "Unknown",
-          sku: (row.products as { sku?: string } | null)?.sku ?? "",
-          location: `${(row.csas as { name?: string } | null)?.name ?? "Unknown"} (CSA)`,
+          location: (row.distributors as { name?: string } | null)?.name ?? "Unknown",
           qty: row.physical_qty,
         });
       }
@@ -90,9 +66,9 @@ export function SalesmanStockReport() {
   const downloadPdf = () => {
     downloadReportPdf({
       fileName: `stock-statement.pdf`,
-      title: "Mapped Stock Statement",
+      title: "Distributor Stock Statement",
       subtitle: selectedLoc === "all" ? new Date().toLocaleDateString("en-IN") : `${selectedLoc} • ${new Date().toLocaleDateString("en-IN")}`,
-      meta: [`Total items: ${locFiltered.length}`, `Distributors mapped: ${distIds.length}`, `CSAs mapped: ${csaIds.length}`],
+      meta: [`Total items: ${locFiltered.length}`, `Distributors mapped: ${distIds.length}`],
       tables: Object.entries(grouped).map(([loc, items]) => ({
         title: `Stock at ${loc}`,
         head: ["Product / SKU", "Qty"],
@@ -108,10 +84,10 @@ export function SalesmanStockReport() {
         <div className="mb-3">
           <Select value={selectedLoc} onValueChange={setSelectedLoc}>
             <SelectTrigger className="w-full bg-card">
-              <SelectValue placeholder="Filter by distributor/CSA" />
+              <SelectValue placeholder="Filter by distributor" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">All mapped locations</SelectItem>
+              <SelectItem value="all">All mapped distributors</SelectItem>
               {locationOptions.map(opt => (
                 <SelectItem key={opt} value={opt}>{opt}</SelectItem>
               ))}
@@ -124,7 +100,7 @@ export function SalesmanStockReport() {
         <Input
           value={q}
           onChange={(e) => setQ(e.target.value)}
-          placeholder="Search product / location…"
+          placeholder="Search product / distributor…"
           className="h-9"
         />
         {q ? (
