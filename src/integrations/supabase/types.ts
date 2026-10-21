@@ -2333,6 +2333,7 @@ export type Database = {
         | "manager"
         | "ase"
         | "asm"
+        | "bde"
         | "business_manager"
         | "hr"
         | "office"
@@ -2482,6 +2483,7 @@ export const Constants = {
         "manager",
         "ase",
         "asm",
+        "bde",
         "business_manager",
         "hr",
         "office",

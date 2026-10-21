@@ -8,6 +8,7 @@ const roles = [
   "distributor",
   "csa",
   "depot",
+  "bde",
   "ase",
   "asm",
   "business_manager",

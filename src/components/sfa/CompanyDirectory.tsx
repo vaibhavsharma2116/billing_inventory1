@@ -38,6 +38,7 @@ const ROLES: { value: string; label: string }[] = [
   "distributor",
   "csa",
   "depot",
+  "bde",
   "ase",
   "asm",
   "business_manager",
@@ -279,11 +280,27 @@ function UserEditor({
         <Picker label="CSA" value={csaId} onChange={setCsaId} options={network?.csas ?? []} allowClear />
         <Picker label="Master depot" value={depotId} onChange={setDepotId} options={network?.depots ?? []} allowClear />
         <Picker
-          label="Reports to"
+          label={
+            roles.includes("bde")
+              ? "Reports to (Select ASE)"
+              : roles.includes("ase")
+              ? "Reports to (Select ASM)"
+              : "Reports to"
+          }
           value={reportsTo}
           onChange={setReportsTo}
           options={users
             .filter((m) => isManagerRole(m.role) && m.id !== user.id)
+            .sort((a, b) => {
+              if (roles.includes("bde")) {
+                if (a.role === "ase" && b.role !== "ase") return -1;
+                if (b.role === "ase" && a.role !== "ase") return 1;
+              } else if (roles.includes("ase")) {
+                if (a.role === "asm" && b.role !== "asm") return -1;
+                if (b.role === "asm" && a.role !== "asm") return 1;
+              }
+              return (a.fullName || a.email || "").localeCompare(b.fullName || b.email || "");
+            })
             .map((m) => ({ id: m.id, name: `${m.fullName || m.email} — ${roleLabel[m.role as AppRole] ?? m.role}` }))}
           noneLabel="No reporting manager"
         />
@@ -435,7 +452,7 @@ function AssignmentEditor({
   });
 
   const managers = users.filter((u) => isManagerRole(u.role));
-  const members = users.filter((u) => ["salesman", "ba", "ase", "asm"].includes(u.role));
+  const members = users.filter((u) => ["salesman", "ba", "bde", "ase", "asm"].includes(u.role));
 
   return (
     <div className="mt-3 grid gap-3 rounded-xl border border-border/60 bg-muted/30 p-3 sm:grid-cols-2">

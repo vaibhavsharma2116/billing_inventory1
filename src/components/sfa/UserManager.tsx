@@ -34,6 +34,7 @@ const ROLES = [
   { value: "distributor", label: "Distributor" },
   { value: "csa", label: "CSA / Super Stockist" },
   { value: "depot", label: "Master Depot Admin" },
+  { value: "bde", label: "BDE (Business Development Executive)" },
   { value: "ase", label: "ASE (Area Sales Executive)" },
   { value: "asm", label: "ASM (Area Sales Manager)" },
   { value: "business_manager", label: "Business Manager" },
@@ -250,11 +251,27 @@ export function UserManager({ createOnly = false }: { createOnly?: boolean } = {
 
           {form.role !== "super_admin" && form.role !== "business_manager" ? (
             <MapField
-              label="Reports to"
+              label={
+                form.role === "bde"
+                  ? "Reports to (Select ASE)"
+                  : form.role === "ase"
+                  ? "Reports to (Select ASM)"
+                  : "Reports to"
+              }
               value={form.reportsTo}
               onChange={(v) => set("reportsTo", v)}
               options={(users ?? [])
                 .filter((u) => isManagerRole(u.role))
+                .sort((a, b) => {
+                  if (form.role === "bde") {
+                    if (a.role === "ase" && b.role !== "ase") return -1;
+                    if (b.role === "ase" && a.role !== "ase") return 1;
+                  } else if (form.role === "ase") {
+                    if (a.role === "asm" && b.role !== "asm") return -1;
+                    if (b.role === "asm" && a.role !== "asm") return 1;
+                  }
+                  return (a.fullName || a.email || "").localeCompare(b.fullName || b.email || "");
+                })
                 .map((u) => ({ id: u.id, name: `${u.fullName || u.email} — ${roleLabel[u.role as AppRole] ?? u.role}` }))}
             />
           ) : null}

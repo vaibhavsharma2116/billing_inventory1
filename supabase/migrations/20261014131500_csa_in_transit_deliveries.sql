@@ -4,6 +4,7 @@ ALTER TABLE public.deliveries ALTER COLUMN distributor_id DROP NOT NULL;
 
 -- Allow depot staff and managers to create and update deliveries
 DROP POLICY IF EXISTS "CSA or admin can create deliveries" ON public.deliveries;
+DROP POLICY IF EXISTS "CSA or depot or admin can create deliveries" ON public.deliveries;
 CREATE POLICY "CSA or depot or admin can create deliveries"
 ON public.deliveries FOR INSERT TO authenticated
 WITH CHECK (
@@ -14,6 +15,7 @@ WITH CHECK (
 );
 
 DROP POLICY IF EXISTS "CSA or admin can edit in-transit deliveries" ON public.deliveries;
+DROP POLICY IF EXISTS "Staff can edit in-transit deliveries" ON public.deliveries;
 CREATE POLICY "Staff can edit in-transit deliveries"
 ON public.deliveries FOR UPDATE TO authenticated
 USING (
@@ -76,6 +78,14 @@ BEGIN
             reserved_qty = GREATEST(reserved_qty - _item.qty, 0),
             updated_at = now()
         WHERE distributor_id = _row.distributor_id AND product_id = _item.product_id;
+
+        -- Return stock back to CSA if order was from CSA
+        IF _row.csa_id IS NOT NULL THEN
+          UPDATE public.csa_stock
+          SET physical_qty = physical_qty + _item.qty,
+              updated_at = now()
+          WHERE csa_id = _row.csa_id AND product_id = _item.product_id;
+        END IF;
       END LOOP;
       UPDATE public.orders SET status = 'rejected' WHERE id = _row.order_id;
     END IF;

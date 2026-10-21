@@ -28,7 +28,7 @@ export function ManagerAssignments() {
 
   const { data: users } = useQuery({ queryKey: ["admin-app-users"], queryFn: () => list() });
   const managers = (users ?? []).filter((u) => isManagerRole(u.role));
-  const members = (users ?? []).filter((u) => u.role === "salesman" || u.role === "ba" || u.role === "ase" || u.role === "asm");
+  const members = (users ?? []).filter((u) => u.role === "salesman" || u.role === "ba" || u.role === "bde" || u.role === "ase" || u.role === "asm");
 
   const { data: network } = useQuery({
     queryKey: ["admin-network-options"],

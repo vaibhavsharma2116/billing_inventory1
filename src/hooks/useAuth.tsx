@@ -12,6 +12,7 @@ export type AppRole =
   | "business_manager"
   | "asm"
   | "ase"
+  | "bde"
   | "salesman"
   | "hr"
   | "office"
@@ -124,6 +125,7 @@ export const roleHome: Record<AppRole, string> = {
   business_manager: "/manager",
   asm: "/manager",
   ase: "/manager",
+  bde: "/manager",
   salesman: "/salesman",
   hr: "/hr",
   office: "/office",
@@ -140,6 +142,7 @@ export const roleLabel: Record<AppRole, string> = {
   business_manager: "Business Manager",
   asm: "ASM (Area Sales Manager)",
   ase: "ASE (Area Sales Executive)",
+  bde: "BDE (Business Development Executive)",
   salesman: "Field Sales",
   hr: "HR / Payroll",
   office: "Office Employee",
@@ -147,7 +150,7 @@ export const roleLabel: Record<AppRole, string> = {
   ba: "Beauty Advisor (BA)",
 };
 
-export const MANAGER_ROLES: AppRole[] = ["manager", "business_manager", "asm", "ase", "office_manager"];
+export const MANAGER_ROLES: AppRole[] = ["manager", "business_manager", "asm", "ase", "bde", "office_manager"];
 
 export const isManagerRole = (role?: string | null) =>
   MANAGER_ROLES.includes(role as AppRole);
