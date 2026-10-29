@@ -128,8 +128,10 @@ function AdminPage() {
 
   const pendingClaims = (claims ?? []).filter((c) => c.status === "pending");
 
+  const today = new Date().toISOString().slice(0, 10);
+
   const { data } = useQuery({
-    queryKey: ["admin-dashboard"],
+    queryKey: ["admin-dashboard", today],
     queryFn: async () => {
       const [orders, invoices, collections, csas, distributors, retailers, profiles, attendance, stock, leaves] =
         await Promise.all([
@@ -142,7 +144,7 @@ function AdminPage() {
           supabase.from("distributors").select("id, name, city, state, outstanding"),
           supabase.from("retailers").select("id, name, city, outstanding"),
           supabase.from("profiles").select("id, full_name, designation"),
-          supabase.from("attendance").select("user_id, punch_in, punch_out, work_date"),
+          supabase.from("attendance").select("user_id, punch_in, punch_out, work_date").eq("work_date", today),
           supabase.from("distributor_stock").select("distributor_id, physical_qty, reserved_qty, products(name, ptr)"),
           supabase.from("leaves").select("id, status"),
         ]);
@@ -165,7 +167,6 @@ function AdminPage() {
   const primary = orders.filter((o: any) => o.kind === "primary").reduce((s: number, o: any) => s + Number(o.total_amount), 0);
   const secondary = orders.filter((o: any) => o.kind === "secondary").reduce((s: number, o: any) => s + Number(o.total_amount), 0);
   const collection = (data?.collections ?? []).reduce((s, c) => s + Number(c.amount), 0);
-  const today = new Date().toISOString().slice(0, 10);
   const present = (data?.attendance ?? []).filter((a) => a.work_date === today && a.punch_in).length;
   const lowStock = (data?.stock ?? []).filter((s) => s.physical_qty - s.reserved_qty <= 10).length;
 

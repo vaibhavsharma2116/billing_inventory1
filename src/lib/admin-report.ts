@@ -20,6 +20,7 @@ export type AdminReport = {
 };
 
 export async function fetchAdminPanel() {
+  const today = new Date().toISOString().slice(0, 10);
   const [orders, invoices, collections, csas, distributors, retailers, profiles, attendance, stock, leaves] =
     await Promise.all([
       (supabase.from("orders") as any)
@@ -35,7 +36,11 @@ export async function fetchAdminPanel() {
       supabase.from("distributors").select("id, name, city, state, outstanding, phone, email").order("name"),
       (supabase.from("retailers") as any).select("id, name, city, state, area, pincode, outstanding, credit_limit, retailer_type, phone, email").order("name"),
       supabase.from("profiles").select("id, full_name, phone, designation, employee_code"),
-      supabase.from("attendance").select("user_id, punch_in, punch_out, work_date, location_label").order("work_date", { ascending: false }),
+      supabase
+        .from("attendance")
+        .select("user_id, punch_in, punch_out, work_date, location_label")
+        .eq("work_date", today)
+        .order("punch_in", { ascending: false }),
       supabase
         .from("distributor_stock")
         .select("id, physical_qty, reserved_qty, products(name, sku, ptr), distributors(name)"),
