@@ -18,7 +18,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { inr, exactInr } from "@/lib/sfa";
 import { downloadReportPdf } from "@/lib/report-pdf";
-import { getPosition, useLocationTracking } from "@/hooks/useLocationTracking";
+import { getPosition, useLocationTracking, reverseGeocode } from "@/hooks/useLocationTracking";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
@@ -160,17 +160,19 @@ function BaPage() {
           `${(e as Error).message}. Please turn GPS on and allow location access to ${kind === "in" ? "check in" : "check out"}.`,
         );
       }
+      const label = await reverseGeocode(pos.coords.latitude, pos.coords.longitude);
       const coords = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+      const attData = { ...coords, ...(label ? { location_label: label } : {}) };
       if (kind === "in") {
         const { error } = await supabase.from("attendance").upsert(
-          { user_id: userId!, work_date: today(), punch_in: new Date().toISOString(), ...coords },
+          { user_id: userId!, work_date: today(), punch_in: new Date().toISOString(), ...attData },
           { onConflict: "user_id,work_date" },
         );
         if (error) throw error;
       } else {
         const { error } = await supabase
           .from("attendance")
-          .update({ punch_out: new Date().toISOString(), ...coords, checkout_note: note || null })
+          .update({ punch_out: new Date().toISOString(), ...attData, checkout_note: note || null })
           .eq("user_id", userId!)
           .eq("work_date", today());
         if (error) throw error;

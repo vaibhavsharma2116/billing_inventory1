@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
-import { BarChart3, CalendarDays, Download, Receipt, ShoppingCart } from "lucide-react";
+import { BarChart3, CalendarDays, Download, MapPin, Receipt, ShoppingCart } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useMe } from "@/hooks/useAuth";
 import { useMappedDistributors } from "@/hooks/useMappedDistributors";
@@ -77,7 +77,7 @@ function MyReportPage() {
         supabase.from("manager_assignments").select("manager_id, distributor_id, csa_id, member_id"),
         supabase
           .from("attendance")
-          .select("work_date, punch_in, punch_out, location_label")
+          .select("work_date, punch_in, punch_out, location_label, lat, lng")
           .eq("user_id", userId!)
           .gte("work_date", range.fromDate)
           .lt("work_date", range.toDate)
@@ -235,7 +235,7 @@ function MyReportPage() {
         a.work_date,
         a.punch_in ? new Date(a.punch_in).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" }) : "-",
         a.punch_out ? new Date(a.punch_out).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" }) : "-",
-        a.location_label ?? "-",
+        a.location_label ?? (a.lat && a.lng ? `GPS (${Number(a.lat).toFixed(3)}, ${Number(a.lng).toFixed(3)})` : "-"),
       ]),
     },
     expenses: {
@@ -405,7 +405,27 @@ function MyReportPage() {
                   <div key={a.work_date} className="flex items-center justify-between gap-3 p-3">
                     <div className="min-w-0">
                       <p className="text-sm font-medium">{a.work_date}</p>
-                      <p className="truncate text-xs text-muted-foreground">{a.location_label ?? "Location not captured"}</p>
+                      <p className="truncate text-xs text-muted-foreground">
+                        {a.location_label ? (
+                          <span className="inline-flex items-center gap-1">
+                            <MapPin className="h-3 w-3 shrink-0 text-primary" />
+                            {a.location_label}
+                          </span>
+                        ) : a.lat && a.lng ? (
+                          <a
+                            href={`https://www.google.com/maps?q=${a.lat},${a.lng}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center gap-1 text-primary hover:underline"
+                            title="View GPS location on Google Maps"
+                          >
+                            <MapPin className="h-3 w-3 shrink-0" />
+                            GPS: {Number(a.lat).toFixed(3)}, {Number(a.lng).toFixed(3)}
+                          </a>
+                        ) : (
+                          "Location not captured"
+                        )}
+                      </p>
                     </div>
                     <span className="shrink-0 text-xs tabular-nums text-muted-foreground">
                       {a.punch_in ? new Date(a.punch_in).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" }) : "-"} →{" "}

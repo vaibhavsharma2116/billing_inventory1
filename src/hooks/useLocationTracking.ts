@@ -36,6 +36,28 @@ export async function tryGetPosition(): Promise<GeolocationPosition | null> {
 }
 
 /**
+ * Resolves a human-readable city/area label from coordinates.
+ * Completely fail-safe: times out in 2500ms, catches all errors, returns null on failure.
+ */
+export async function reverseGeocode(lat: number, lng: number): Promise<string | null> {
+  try {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 2500);
+    const res = await fetch(
+      `https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${lat}&longitude=${lng}&localityLanguage=en`,
+      { signal: controller.signal },
+    );
+    clearTimeout(timer);
+    if (!res.ok) return null;
+    const data = await res.json();
+    const parts = [data.locality || data.city, data.principalSubdivision].filter(Boolean);
+    return parts.length > 0 ? parts.join(", ") : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
  * Keeps a live GPS watch running while the salesman is punched in and
  * stores a location ping every few minutes until punch out.
  */

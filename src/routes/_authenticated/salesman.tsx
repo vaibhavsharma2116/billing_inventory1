@@ -16,7 +16,7 @@ import { DistributorVisitDialog } from "@/components/sfa/DistributorVisitDialog"
 import { LeaveApply } from "@/components/sfa/LeaveApply";
 import { PaymentHistory } from "@/components/sfa/PaymentHistory";
 import { inr, stockTone } from "@/lib/sfa";
-import { useLocationTracking, tryGetPosition } from "@/hooks/useLocationTracking";
+import { useLocationTracking, tryGetPosition, reverseGeocode } from "@/hooks/useLocationTracking";
 import { useMappedDistributors } from "@/hooks/useMappedDistributors";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useState } from "react";
@@ -95,7 +95,14 @@ function SalesmanPage() {
       if (!userId) throw new Error("Your profile is still loading — please try again in a moment.");
       // Try GPS, but never block attendance if the device/browser refuses it.
       const pos = await tryGetPosition();
-      const coords = pos ? { lat: pos.coords.latitude, lng: pos.coords.longitude } : {};
+      const label = pos ? await reverseGeocode(pos.coords.latitude, pos.coords.longitude) : null;
+      const coords = pos
+        ? {
+            lat: pos.coords.latitude,
+            lng: pos.coords.longitude,
+            ...(label ? { location_label: label } : {}),
+          }
+        : {};
       if (kind === "in") {
         const { error } = await supabase.from("attendance").upsert(
           { user_id: userId, work_date: today(), punch_in: new Date().toISOString(), punch_out: null, ...coords },
