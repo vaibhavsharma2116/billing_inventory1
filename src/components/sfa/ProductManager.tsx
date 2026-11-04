@@ -178,6 +178,12 @@ export function ProductManager() {
     onError: (e: Error) => toast.error(e.message),
   });
 
+  const serialMap = useMemo(() => {
+    const map = new Map<string, number>();
+    products.forEach((p, i) => map.set(p.id, i + 1));
+    return map;
+  }, [products]);
+
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
     if (!q) return products;
@@ -212,21 +218,25 @@ export function ProductManager() {
         ) : filtered.length === 0 ? (
           <p className="p-4 text-sm text-muted-foreground">No products yet. Add your first SKU.</p>
         ) : (
-          filtered.map((p) => (
+          filtered.map((p, idx) => (
             <button
               key={p.id}
               onClick={() => startEdit(p)}
               className="flex w-full items-center justify-between gap-3 p-3 text-left text-sm hover:bg-muted/40"
             >
-              <div className="min-w-0">
-                <p className="truncate font-medium">
-                  {p.name}
-                  {p.packing_size ? <span className="text-muted-foreground"> • {p.packing_size}</span> : null}
-                </p>
-                <p className="text-[11px] text-muted-foreground">
-                  {p.sku} • HSN {p.hsn ?? "—"} • GST {p.gst_rate}% • Company stock {stockBy[p.id]?.qty ?? 0}
-                </p>
-
+              <div className="flex min-w-0 items-center gap-3">
+                <span className="flex h-7 min-w-[28px] shrink-0 items-center justify-center rounded-md bg-muted px-1.5 text-xs font-semibold tabular-nums text-muted-foreground">
+                  {serialMap.get(p.id) ?? idx + 1}
+                </span>
+                <div className="min-w-0">
+                  <p className="truncate font-medium">
+                    {p.name}
+                    {p.packing_size ? <span className="text-muted-foreground"> • {p.packing_size}</span> : null}
+                  </p>
+                  <p className="text-[11px] text-muted-foreground">
+                    {p.sku} • HSN {p.hsn ?? "—"} • GST {p.gst_rate}% • Company stock {stockBy[p.id]?.qty ?? 0}
+                  </p>
+                </div>
               </div>
               <div className="shrink-0 text-right text-[11px] text-muted-foreground">
                 <p className="text-sm font-semibold tabular-nums text-foreground">MRP {inr(p.mrp)}</p>
@@ -242,7 +252,7 @@ export function ProductManager() {
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-lg">
           <DialogHeader>
-            <DialogTitle>{editId ? "Edit Product" : "New Product"}</DialogTitle>
+            <DialogTitle>{editId ? `Edit Product #${serialMap.get(editId) ?? ""}` : "New Product"}</DialogTitle>
             <DialogDescription>
               Saved products appear in every channel — CSA, distributor, salesman and BA.
             </DialogDescription>
