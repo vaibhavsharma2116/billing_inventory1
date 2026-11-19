@@ -94,7 +94,7 @@ function ManagerDashboard() {
         supabase.from("manager_assignments").select("manager_id, distributor_id, csa_id, member_id"),
         supabase.from("depots").select("id, name, city, state"),
         supabase.from("leaves").select("user_id, from_date, to_date, status").eq("status", "approved").lte("from_date", to).gte("to_date", from),
-        supabase.from("company_holidays").select("holiday_date").gte("holiday_date", from).lte("holiday_date", to),
+        supabase.from("company_holidays").select("id, date, name").gte("date", from).lte("date", to),
         supabase.from("user_roles").select("user_id, role"),
       ]);
 
