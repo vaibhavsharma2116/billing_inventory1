@@ -1,13 +1,18 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { Fragment, useState, type ReactNode } from "react";
+import { Fragment, useState, useMemo, lazy, Suspense, type ReactNode } from "react";
+import { ClientOnly } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { useMe, roleLabel } from "@/hooks/useAuth";
+import { useMe, roleLabel, type AppRole } from "@/hooks/useAuth";
 import { Shell, StatCard, Section } from "@/components/sfa/Shell";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { inr } from "@/lib/sfa";
+import { MapPin, ExternalLink } from "lucide-react";
+import type { SalesmanPosition } from "@/components/sfa/live-map-types";
+
+const LiveMap = lazy(() => import("@/components/sfa/LiveMap"));
 
 const monthStart = () => new Date().toISOString().slice(0, 8) + "01";
 const todayStr = () => new Date().toISOString().slice(0, 10);
@@ -42,14 +47,22 @@ function ManagerDashboard() {
   const [card, setCard] = useState<string | null>(null);
   const [from, setFrom] = useState(monthStart());
   const [to, setTo] = useState(todayStr());
+  const [teamDate, setTeamDate] = useState(todayStr());
+  const [teamView, setTeamView] = useState<"attendance" | "performance">("attendance");
+  const [teamSearch, setTeamSearch] = useState("");
+  const [teamRoleFilter, setTeamRoleFilter] = useState("all");
+  const [teamSupervisorFilter, setTeamSupervisorFilter] = useState("all");
+  const [teamMapMode, setTeamMapMode] = useState<"list" | "map">("list");
 
+  const attFrom = teamDate < from ? teamDate : from;
+  const attTo = teamDate > to ? teamDate : to;
 
   const { data, isLoading } = useQuery({
-    queryKey: ["manager-scope", me?.profile?.id ?? null, from, to],
+    queryKey: ["manager-scope", me?.profile?.id ?? null, from, to, teamDate],
     enabled: !!me?.profile?.id,
     queryFn: async () => {
       const managerId = me!.profile!.id;
-      const [dist, csa, ret, ord, coll, vis, att, ba, prof, asg, dep, lvs, hols] = await Promise.all([
+      const [dist, csa, ret, ord, coll, vis, att, attToday, ba, prof, asg, dep, lvs, hols, uRoles] = await Promise.all([
         supabase.from("distributors").select("id, name, city, state, outstanding, csa_id"),
         supabase.from("csas").select("id, name, city, state, depot_id"),
         supabase.from("retailers").select("id, name, city, retailer_type, distributor_id, outstanding, credit_limit"),
@@ -65,9 +78,15 @@ function ManagerDashboard() {
         supabase.from("visits").select("id, salesman_id, retailer_id, productive, checked_in_at")
           .gte("checked_in_at", `${from}T00:00:00`)
           .lte("checked_in_at", `${to}T23:59:59`),
-        supabase.from("attendance").select("id, user_id, work_date, punch_in, punch_out")
-          .gte("work_date", from)
-          .lte("work_date", to),
+        supabase.from("attendance").select("id, user_id, work_date, punch_in, punch_out, lat, lng, location_label")
+          .gte("work_date", attFrom)
+          .lte("work_date", attTo)
+          .order("work_date", { ascending: false })
+          .limit(1000),
+        supabase
+          .from("attendance")
+          .select("id, user_id, work_date, punch_in, punch_out, lat, lng, location_label")
+          .eq("work_date", teamDate),
         supabase.from("ba_sales").select("id, ba_id, amount, qty, sale_date")
           .gte("sale_date", from)
           .lte("sale_date", to),
@@ -76,6 +95,7 @@ function ManagerDashboard() {
         supabase.from("depots").select("id, name, city, state"),
         supabase.from("leaves").select("user_id, from_date, to_date, status").eq("status", "approved").lte("from_date", to).gte("to_date", from),
         supabase.from("company_holidays").select("holiday_date").gte("holiday_date", from).lte("holiday_date", to),
+        supabase.from("user_roles").select("user_id, role"),
       ]);
 
 
@@ -137,6 +157,31 @@ function ManagerDashboard() {
       );
 
 
+      const rolePriority = (r: string) => {
+        if (r === "super_admin") return 100;
+        if (r === "manager" || r === "business_manager") return 90;
+        if (r === "asm") return 80;
+        if (r === "ase") return 70;
+        if (r === "bde") return 60;
+        if (r === "ba") return 50;
+        if (r === "office") return 40;
+        if (r === "salesman") return 30;
+        return 10;
+      };
+      const rolesList = (uRoles.data ?? []) as { user_id: string; role: string }[];
+      const roleMap = new Map<string, string>();
+      [...rolesList]
+        .sort((a, b) => rolePriority(a.role) - rolePriority(b.role))
+        .forEach((r) => roleMap.set(r.user_id, r.role));
+      const combinedAttendance = [...(attToday.data ?? [])];
+      const seenAtt = new Set(combinedAttendance.map((a) => `${a.user_id}|${a.work_date}`));
+      (att.data ?? []).forEach((a) => {
+        if (!seenAtt.has(`${a.user_id}|${a.work_date}`)) {
+          combinedAttendance.push(a);
+          seenAtt.add(`${a.user_id}|${a.work_date}`);
+        }
+      });
+
       return {
         distributors,
         csas,
@@ -150,11 +195,14 @@ function ManagerDashboard() {
         visits: (vis.data ?? []).filter(
           (v) => memberIds.has(v.salesman_id) || (v.retailer_id && retailerIds.has(v.retailer_id)),
         ),
-        attendance: (att.data ?? []).filter((a) => memberIds.has(a.user_id)),
+        attendance: combinedAttendance.filter((a) => memberIds.has(a.user_id)),
         baSales: (ba.data ?? []).filter((b) => memberIds.has(b.ba_id)),
         leaves: (lvs.data ?? []).filter((l) => memberIds.has(l.user_id)),
         holidays: hols.data ?? [],
         profiles,
+        allProfiles,
+        userRoles: rolesList,
+        roleMap,
       };
     },
   });
@@ -282,6 +330,106 @@ function ManagerDashboard() {
         managerName: mgr === me?.profile?.id ? "you" : nameOfUser(mgr),
       };
     });
+
+  const teamAttendanceRows = useMemo(() => {
+    if (!data) return [];
+    const attOnDate = data.attendance.filter((a) => a.work_date === teamDate);
+    const attMap = new Map(attOnDate.map((a) => [a.user_id, a]));
+    const allProfs = data.allProfiles ?? [];
+    const rMap = data.roleMap ?? new Map();
+
+    return (data.profiles ?? []).map((p) => {
+      const rawRole = rMap.get(p.id) || p.designation || "salesman";
+      const sup = allProfs.find((x) => x.id === p.reports_to);
+      const att = attMap.get(p.id);
+
+      const punchIn = att?.punch_in ?? null;
+      const punchOut = att?.punch_out ?? null;
+      const lat = att?.lat ? Number(att.lat) : null;
+      const lng = att?.lng ? Number(att.lng) : null;
+      const locationLabel = att?.location_label || (lat && lng ? `${lat.toFixed(4)}, ${lng.toFixed(4)}` : null);
+
+      let status: "punched_in" | "punched_out" | "not_punched" = "not_punched";
+      if (punchIn && !punchOut) status = "punched_in";
+      else if (punchIn && punchOut) status = "punched_out";
+
+      const rLabel = roleLabel[rawRole as AppRole] ?? (p.designation || rawRole.toUpperCase());
+
+      return {
+        id: p.id,
+        name: p.full_name || "Employee",
+        phone: p.phone,
+        role: rawRole,
+        roleTitle: rLabel,
+        supervisorId: p.reports_to ?? null,
+        supervisorName: sup?.full_name ?? "—",
+        status,
+        punchIn,
+        punchOut,
+        lat,
+        lng,
+        locationLabel,
+      };
+    });
+  }, [data, teamDate]);
+
+  const filteredTeamAttendance = useMemo(() => {
+    let rows = teamAttendanceRows;
+    const q = teamSearch.trim().toLowerCase();
+    if (q) {
+      rows = rows.filter(
+        (r) =>
+          r.name.toLowerCase().includes(q) ||
+          (r.phone && r.phone.toLowerCase().includes(q)) ||
+          (r.locationLabel && r.locationLabel.toLowerCase().includes(q)) ||
+          r.roleTitle.toLowerCase().includes(q) ||
+          r.supervisorName.toLowerCase().includes(q),
+      );
+    }
+    if (teamRoleFilter !== "all") {
+      rows = rows.filter((r) => r.role === teamRoleFilter);
+    }
+    if (teamSupervisorFilter !== "all") {
+      rows = rows.filter((r) => r.supervisorId === teamSupervisorFilter);
+    }
+    return rows;
+  }, [teamAttendanceRows, teamSearch, teamRoleFilter, teamSupervisorFilter]);
+
+  const teamPositions: SalesmanPosition[] = useMemo(() => {
+    return filteredTeamAttendance
+      .filter((r) => r.lat && r.lng)
+      .map((r) => ({
+        userId: r.id,
+        name: `${r.name} (${r.roleTitle})`,
+        lat: r.lat!,
+        lng: r.lng!,
+        recordedAt: r.punchOut || r.punchIn || new Date().toISOString(),
+        accuracy: null,
+        punchedIn: r.status === "punched_in",
+      }));
+  }, [filteredTeamAttendance]);
+
+  const supervisorOptions = useMemo(() => {
+    const supMap = new Map<string, string>();
+    teamAttendanceRows.forEach((r) => {
+      if (r.supervisorId && r.supervisorName !== "—") {
+        supMap.set(r.supervisorId, r.supervisorName);
+      }
+    });
+    return Array.from(supMap.entries()).map(([id, name]) => ({ id, name }));
+  }, [teamAttendanceRows]);
+
+  const distinctRoles = useMemo(() => {
+    const rMap = new Map<string, string>();
+    teamAttendanceRows.forEach((r) => {
+      rMap.set(r.role, r.roleTitle);
+    });
+    return Array.from(rMap.entries()).map(([role, title]) => ({ role, title }));
+  }, [teamAttendanceRows]);
+
+  const onDutyCount = teamAttendanceRows.filter((r) => r.status === "punched_in").length;
+  const closedCount = teamAttendanceRows.filter((r) => r.status === "punched_out").length;
+  const notPunchedCount = teamAttendanceRows.filter((r) => r.status === "not_punched").length;
 
   const exportPdf = () =>
     downloadReportPdf({
@@ -638,42 +786,275 @@ function ManagerDashboard() {
             </TabsContent>
 
             <TabsContent value="team">
-              <Section title="Salesman / BA performance">
-                <Table
-                  head={["Member", "Role", "Sales", "Visits", "Productive", "Collections", "Present", "Leaves", "Holidays"]}
-                  rows={teamRows.map((t) => [
-                    t.name,
-                    t.designation,
-                    inr(t.sales),
-                    String(t.visits),
-                    String(t.productive),
-                    inr(t.collections),
-                    String(t.presentDays),
-                    String(t.leaveDays),
-                    String(t.holidays),
-                  ])}
-                  detail={(i) => {
-                    const t = teamRows[i]!;
-                    const rows = secondary
-                      .filter((o) => o.salesman_id === t.id)
-                      .map((o) => [o.order_no, nameOfRetailer(o.retailer_id), o.status, inr(Number(o.total_amount ?? 0)), dt(o.created_at)]);
-                    return (
-                      <MiniDetail
-                        stats={[
-                          ["Sales", inr(t.sales)],
-                          ["Visits", `${t.productive}/${t.visits} productive`],
-                          ["Collections", inr(t.collections)],
-                          ["Present", String(t.presentDays)],
-                          ["Leaves", String(t.leaveDays)],
-                          ["Holidays", String(t.holidays)],
-                        ]}
-                        head={["Order", "Retailer", "Status", "Value", "Date"]}
-                        rows={rows}
+              <div className="space-y-4">
+                {/* Sub-view Switcher: Attendance vs Performance */}
+                <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border/60 pb-3">
+                  <div className="flex flex-wrap gap-1">
+                    <Button
+                      size="sm"
+                      variant={teamView === "attendance" ? "default" : "outline"}
+                      onClick={() => setTeamView("attendance")}
+                    >
+                      📍 Live Attendance & Location ({onDutyCount} on duty)
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant={teamView === "performance" ? "default" : "outline"}
+                      onClick={() => setTeamView("performance")}
+                    >
+                      📊 Performance Summary
+                    </Button>
+                  </div>
+                  {teamView === "attendance" && (
+                    <div className="flex items-center gap-2">
+                      <Label className="text-xs text-muted-foreground whitespace-nowrap">Date:</Label>
+                      <Input
+                        type="date"
+                        className="h-8 w-36 text-xs bg-background"
+                        value={teamDate}
+                        max={todayStr()}
+                        onChange={(e) => setTeamDate(e.target.value)}
                       />
-                    );
-                  }}
-                />
-              </Section>
+                      {teamDate !== todayStr() && (
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="h-8 text-xs px-2"
+                          onClick={() => setTeamDate(todayStr())}
+                        >
+                          Today
+                        </Button>
+                      )}
+                    </div>
+                  )}
+                </div>
+
+                {teamView === "attendance" ? (
+                  <div className="space-y-4">
+                    {/* Stat Badges */}
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                      <StatCard label="Total Team" value={String(teamAttendanceRows.length)} />
+                      <StatCard label="Punched In (Active)" value={String(onDutyCount)} tone="success" hint="Working now" />
+                      <StatCard label="Day Closed" value={String(closedCount)} tone="primary" hint="Punched out" />
+                      <StatCard label="Not Punched" value={String(notPunchedCount)} tone="danger" hint="Absent / Off" />
+                    </div>
+
+                    {/* Filter and View Bar */}
+                    <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-border/60 bg-muted/20 p-2.5">
+                      <div className="flex flex-wrap items-center gap-2 flex-1 min-w-[280px]">
+                        <Input
+                          placeholder="Search member, phone, location..."
+                          className="h-8 text-xs bg-background max-w-[240px]"
+                          value={teamSearch}
+                          onChange={(e) => setTeamSearch(e.target.value)}
+                        />
+                        {distinctRoles.length > 1 && (
+                          <select
+                            className="h-8 rounded-md border border-input bg-background px-2.5 text-xs"
+                            value={teamRoleFilter}
+                            onChange={(e) => setTeamRoleFilter(e.target.value)}
+                          >
+                            <option value="all">All roles ({teamAttendanceRows.length})</option>
+                            {distinctRoles.map((r) => (
+                              <option key={r.role} value={r.role}>
+                                {r.title}
+                              </option>
+                            ))}
+                          </select>
+                        )}
+                        {supervisorOptions.length > 1 && (
+                          <select
+                            className="h-8 rounded-md border border-input bg-background px-2.5 text-xs max-w-[200px]"
+                            value={teamSupervisorFilter}
+                            onChange={(e) => setTeamSupervisorFilter(e.target.value)}
+                          >
+                            <option value="all">All supervisors</option>
+                            {supervisorOptions.map((s) => (
+                              <option key={s.id} value={s.id}>
+                                Under {s.name}
+                              </option>
+                            ))}
+                          </select>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-1">
+                        <Button
+                          size="sm"
+                          variant={teamMapMode === "list" ? "default" : "outline"}
+                          className="h-8 text-xs"
+                          onClick={() => setTeamMapMode("list")}
+                        >
+                          📋 List
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant={teamMapMode === "map" ? "default" : "outline"}
+                          className="h-8 text-xs"
+                          onClick={() => setTeamMapMode("map")}
+                        >
+                          🗺️ Map ({teamPositions.length})
+                        </Button>
+                      </div>
+                    </div>
+
+                    {/* Content: Map or List */}
+                    {teamMapMode === "map" ? (
+                      <Section title={`Team Map — ${new Date(`${teamDate}T00:00:00`).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}`}>
+                        <div className="p-2 space-y-2">
+                          <ClientOnly fallback={<div className="h-[420px] w-full animate-pulse rounded-2xl bg-muted" />}>
+                            <Suspense fallback={<div className="h-[420px] w-full animate-pulse rounded-2xl bg-muted" />}>
+                              <LiveMap positions={teamPositions} />
+                            </Suspense>
+                          </ClientOnly>
+                          <p className="text-[11px] text-muted-foreground text-center">
+                            Showing {teamPositions.length} members with GPS coordinates. Green marker = Active, Gray = Punched out.
+                          </p>
+                        </div>
+                      </Section>
+                    ) : (
+                      <Section title={`Team Attendance & Location — ${new Date(`${teamDate}T00:00:00`).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })} (${filteredTeamAttendance.length})`}>
+                        {filteredTeamAttendance.length === 0 ? (
+                          <p className="p-4 text-center text-sm text-muted-foreground">No team members match your filter.</p>
+                        ) : (
+                          <div className="overflow-x-auto">
+                            <table className="w-full text-sm">
+                              <thead>
+                                <tr className="border-b border-border/60 text-left text-xs uppercase tracking-wide text-muted-foreground">
+                                  <th className="px-3 py-2.5 font-medium">Member</th>
+                                  <th className="px-3 py-2.5 font-medium">Reports To</th>
+                                  <th className="px-3 py-2.5 font-medium">Status</th>
+                                  <th className="px-3 py-2.5 font-medium">Punch In</th>
+                                  <th className="px-3 py-2.5 font-medium">Punch Out</th>
+                                  <th className="px-3 py-2.5 font-medium">Location</th>
+                                  <th className="px-3 py-2.5 font-medium text-right">Map</th>
+                                </tr>
+                              </thead>
+                              <tbody className="divide-y divide-border/40">
+                                {filteredTeamAttendance.map((m) => {
+                                  const pinTime = m.punchIn
+                                    ? new Date(m.punchIn).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", hour12: true })
+                                    : "—";
+                                  const poutTime = m.punchOut
+                                    ? new Date(m.punchOut).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", hour12: true })
+                                    : m.punchIn
+                                      ? "Working..."
+                                      : "—";
+
+                                  return (
+                                    <tr key={m.id} className="hover:bg-muted/30 transition-colors">
+                                      <td className="px-3 py-2.5 whitespace-nowrap">
+                                        <div className="flex flex-col">
+                                          <div className="flex items-center gap-1.5">
+                                            <span className="font-medium text-foreground">{m.name}</span>
+                                            <Badge variant="outline" className="text-[10px] px-1.5 py-0 h-4">
+                                              {m.roleTitle}
+                                            </Badge>
+                                          </div>
+                                          {m.phone && <span className="text-[11px] text-muted-foreground">{m.phone}</span>}
+                                        </div>
+                                      </td>
+                                      <td className="px-3 py-2.5 whitespace-nowrap text-xs text-muted-foreground">
+                                        {m.supervisorName}
+                                      </td>
+                                      <td className="px-3 py-2.5 whitespace-nowrap">
+                                        {m.status === "punched_in" && (
+                                          <span className="inline-flex items-center gap-1 text-xs font-medium text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/20">
+                                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                                            On Duty
+                                          </span>
+                                        )}
+                                        {m.status === "punched_out" && (
+                                          <span className="inline-flex items-center gap-1 text-xs font-medium text-blue-600 dark:text-blue-400 bg-blue-500/10 px-2 py-0.5 rounded-full border border-blue-500/20">
+                                            <span className="w-1.5 h-1.5 rounded-full bg-blue-500" />
+                                            Day Closed
+                                          </span>
+                                        )}
+                                        {m.status === "not_punched" && (
+                                          <span className="inline-flex items-center gap-1 text-xs font-medium text-muted-foreground bg-muted/40 px-2 py-0.5 rounded-full">
+                                            <span className="w-1.5 h-1.5 rounded-full bg-muted-foreground/50" />
+                                            Not Punched
+                                          </span>
+                                        )}
+                                      </td>
+                                      <td className="px-3 py-2.5 whitespace-nowrap text-xs">
+                                        {pinTime}
+                                      </td>
+                                      <td className="px-3 py-2.5 whitespace-nowrap text-xs">
+                                        {poutTime}
+                                      </td>
+                                      <td className="px-3 py-2.5 text-xs max-w-[220px] truncate" title={m.locationLabel || "No location recorded"}>
+                                        {m.locationLabel ? (
+                                          <span className="inline-flex items-center gap-1 text-muted-foreground">
+                                            <MapPin className="size-3 shrink-0 text-muted-foreground" />
+                                            <span className="truncate">{m.locationLabel}</span>
+                                          </span>
+                                        ) : (
+                                          <span className="text-muted-foreground/60">—</span>
+                                        )}
+                                      </td>
+                                      <td className="px-3 py-2.5 whitespace-nowrap text-right">
+                                        {m.lat && m.lng ? (
+                                          <a
+                                            href={`https://www.google.com/maps?q=${m.lat},${m.lng}`}
+                                            target="_blank"
+                                            rel="noreferrer"
+                                            className="inline-flex items-center gap-1 text-xs text-primary hover:underline"
+                                          >
+                                            <ExternalLink className="size-3" /> Maps
+                                          </a>
+                                        ) : (
+                                          <span className="text-muted-foreground/40 text-xs">—</span>
+                                        )}
+                                      </td>
+                                    </tr>
+                                  );
+                                })}
+                              </tbody>
+                            </table>
+                          </div>
+                        )}
+                      </Section>
+                    )}
+                  </div>
+                ) : (
+                  <Section title="Salesman / BA performance">
+                    <Table
+                      head={["Member", "Role", "Sales", "Visits", "Productive", "Collections", "Present", "Leaves", "Holidays"]}
+                      rows={teamRows.map((t) => [
+                        t.name,
+                        t.designation,
+                        inr(t.sales),
+                        String(t.visits),
+                        String(t.productive),
+                        inr(t.collections),
+                        String(t.presentDays),
+                        String(t.leaveDays),
+                        String(t.holidays),
+                      ])}
+                      detail={(i) => {
+                        const t = teamRows[i]!;
+                        const rows = secondary
+                          .filter((o) => o.salesman_id === t.id)
+                          .map((o) => [o.order_no, nameOfRetailer(o.retailer_id), o.status, inr(Number(o.total_amount ?? 0)), dt(o.created_at)]);
+                        return (
+                          <MiniDetail
+                            stats={[
+                              ["Sales", inr(t.sales)],
+                              ["Visits", `${t.productive}/${t.visits} productive`],
+                              ["Collections", inr(t.collections)],
+                              ["Present", String(t.presentDays)],
+                              ["Leaves", String(t.leaveDays)],
+                              ["Holidays", String(t.holidays)],
+                            ]}
+                            head={["Order", "Retailer", "Status", "Value", "Date"]}
+                            rows={rows}
+                          />
+                        );
+                      }}
+                    />
+                  </Section>
+                )}
+              </div>
             </TabsContent>
 
             <TabsContent value="orders">
