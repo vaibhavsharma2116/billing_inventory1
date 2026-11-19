@@ -101,61 +101,7 @@ function ManagerDashboard() {
 
       const allAssignments = asg.data ?? [];
       const allProfiles = prof.data ?? [];
-
-      // downline = this manager + everyone reporting (directly or indirectly) to them
-      const downline = new Set<string>([managerId]);
-      let grew = true;
-      while (grew) {
-        grew = false;
-        allProfiles.forEach((p) => {
-          if (p.reports_to && downline.has(p.reports_to) && !downline.has(p.id)) {
-            downline.add(p.id);
-            grew = true;
-          }
-        });
-      }
-
-      const assignments = allAssignments.filter((a) => a.manager_id && downline.has(a.manager_id));
-
-      const distIds = new Set(assignments.map((a) => a.distributor_id).filter(Boolean) as string[]);
-      const csaIds = new Set(assignments.map((a) => a.csa_id).filter(Boolean) as string[]);
-      const memberIds = new Set(assignments.map((a) => a.member_id).filter(Boolean) as string[]);
-      // reporting chain (excluding self) also counts as assigned team
-      downline.forEach((id) => {
-        if (id !== managerId) memberIds.add(id);
-      });
-      // members mapped to an assigned distributor / CSA
-      allProfiles.forEach((p) => {
-        if ((p.distributor_id && distIds.has(p.distributor_id)) || (p.csa_id && csaIds.has(p.csa_id))) {
-          memberIds.add(p.id);
-        }
-      });
-
-      const distributors = (dist.data ?? []).filter((d) => distIds.has(d.id));
-      const csas = (csa.data ?? []).filter((c) => csaIds.has(c.id));
-      const retailers = (ret.data ?? []).filter((r) => !!r.distributor_id && distIds.has(r.distributor_id));
-      const retailerIds = new Set(retailers.map((r) => r.id));
-      const profiles = allProfiles.filter((p) => memberIds.has(p.id));
-
-      // master depots reachable through assigned CSAs or team members
-      const depotIds = new Set<string>();
-      csas.forEach((c) => {
-        if (c.depot_id) depotIds.add(c.depot_id);
-      });
-      allProfiles.forEach((p) => {
-        if (p.depot_id && memberIds.has(p.id)) depotIds.add(p.depot_id);
-      });
-      const depots = (dep.data ?? []).filter((d) => depotIds.has(d.id));
-
-      const orders = (ord.data ?? []).filter(
-        (o) =>
-          (o.distributor_id && distIds.has(o.distributor_id)) ||
-          (o.csa_id && csaIds.has(o.csa_id)) ||
-          (o.retailer_id && retailerIds.has(o.retailer_id)) ||
-          (o.salesman_id && memberIds.has(o.salesman_id)) ||
-          (o.depot_id && depotIds.has(o.depot_id)),
-      );
-
+      const rolesList = (uRoles.data ?? []) as { user_id: string; role: string }[];
 
       const rolePriority = (r: string) => {
         if (r === "super_admin") return 100;
@@ -168,11 +114,103 @@ function ManagerDashboard() {
         if (r === "salesman") return 30;
         return 10;
       };
-      const rolesList = (uRoles.data ?? []) as { user_id: string; role: string }[];
       const roleMap = new Map<string, string>();
       [...rolesList]
         .sort((a, b) => rolePriority(a.role) - rolePriority(b.role))
         .forEach((r) => roleMap.set(r.user_id, r.role));
+
+      const partyRoles = new Set(["distributor", "csa", "depot"]);
+      const userRolesMap = new Map<string, string[]>();
+      rolesList.forEach((r) => {
+        const list = userRolesMap.get(r.user_id) || [];
+        list.push(r.role);
+        userRolesMap.set(r.user_id, list);
+      });
+
+      const isPartyUser = (userId: string, designation?: string | null) => {
+        const rList = userRolesMap.get(userId) || [];
+        if (rList.some((r) => partyRoles.has(r))) return true;
+        if (designation && partyRoles.has(designation.toLowerCase())) return true;
+        return false;
+      };
+
+      // Only actual employees (non-parties) can be in employee hierarchy
+      const employeeProfiles = allProfiles.filter((p) => !isPartyUser(p.id, p.designation));
+      const employeeMap = new Map(employeeProfiles.map((p) => [p.id, p]));
+
+      // downline = this manager + everyone reporting (directly or indirectly) to them who is an employee
+      const downline = new Set<string>([managerId]);
+      let grew = true;
+      while (grew) {
+        grew = false;
+        employeeProfiles.forEach((p) => {
+          if (p.reports_to && downline.has(p.reports_to) && !downline.has(p.id)) {
+            downline.add(p.id);
+            grew = true;
+          }
+        });
+      }
+
+      const teamEmployeeIds = new Set<string>();
+      downline.forEach((id) => {
+        if (id !== managerId && employeeMap.has(id)) {
+          teamEmployeeIds.add(id);
+        }
+      });
+
+      const myRoles = userRolesMap.get(managerId) || [];
+      const isAdmin = myRoles.some((r) => r === "admin" || r === "super_admin");
+      if (isAdmin && teamEmployeeIds.size === 0) {
+        employeeProfiles.forEach((p) => {
+          if (p.id !== managerId) teamEmployeeIds.add(p.id);
+        });
+      }
+
+      // assignments for distributors / CSAs mapped to this manager or their downline
+      const assignments = allAssignments.filter((a) => a.manager_id && downline.has(a.manager_id));
+
+      const distIds = new Set(assignments.map((a) => a.distributor_id).filter(Boolean) as string[]);
+      const csaIds = new Set(assignments.map((a) => a.csa_id).filter(Boolean) as string[]);
+
+      if (isAdmin && distIds.size === 0) {
+        (dist.data ?? []).forEach((d) => distIds.add(d.id));
+        (csa.data ?? []).forEach((c) => csaIds.add(c.id));
+      } else {
+        allProfiles.forEach((p) => {
+          if (downline.has(p.id)) {
+            if (p.distributor_id) distIds.add(p.distributor_id);
+            if (p.csa_id) csaIds.add(p.csa_id);
+          }
+        });
+      }
+
+      const distributors = (dist.data ?? []).filter((d) => distIds.has(d.id));
+      const csas = (csa.data ?? []).filter((c) => csaIds.has(c.id));
+      const retailers = (ret.data ?? []).filter((r) => !!r.distributor_id && distIds.has(r.distributor_id));
+      const retailerIds = new Set(retailers.map((r) => r.id));
+
+      // profiles = ONLY the employee team reporting under this manager!
+      const profiles = employeeProfiles.filter((p) => teamEmployeeIds.has(p.id));
+
+      // master depots reachable through assigned CSAs or team members
+      const depotIds = new Set<string>();
+      csas.forEach((c) => {
+        if (c.depot_id) depotIds.add(c.depot_id);
+      });
+      allProfiles.forEach((p) => {
+        if (p.depot_id && (downline.has(p.id) || teamEmployeeIds.has(p.id))) depotIds.add(p.depot_id);
+      });
+      const depots = (dep.data ?? []).filter((d) => depotIds.has(d.id));
+
+      const orders = (ord.data ?? []).filter(
+        (o) =>
+          (o.distributor_id && distIds.has(o.distributor_id)) ||
+          (o.csa_id && csaIds.has(o.csa_id)) ||
+          (o.retailer_id && retailerIds.has(o.retailer_id)) ||
+          (o.salesman_id && (teamEmployeeIds.has(o.salesman_id) || o.salesman_id === managerId)) ||
+          (o.depot_id && depotIds.has(o.depot_id)),
+      );
+
       const combinedAttendance = [...(attToday.data ?? [])];
       const seenAtt = new Set(combinedAttendance.map((a) => `${a.user_id}|${a.work_date}`));
       (att.data ?? []).forEach((a) => {
@@ -190,14 +228,17 @@ function ManagerDashboard() {
         orders,
         collections: (coll.data ?? []).filter(
           (c) =>
-            (c.salesman_id && memberIds.has(c.salesman_id)) || (c.retailer_id && retailerIds.has(c.retailer_id)),
+            (c.salesman_id && (teamEmployeeIds.has(c.salesman_id) || c.salesman_id === managerId)) ||
+            (c.retailer_id && retailerIds.has(c.retailer_id)),
         ),
         visits: (vis.data ?? []).filter(
-          (v) => memberIds.has(v.salesman_id) || (v.retailer_id && retailerIds.has(v.retailer_id)),
+          (v) =>
+            (v.salesman_id && (teamEmployeeIds.has(v.salesman_id) || v.salesman_id === managerId)) ||
+            (v.retailer_id && retailerIds.has(v.retailer_id)),
         ),
-        attendance: combinedAttendance.filter((a) => memberIds.has(a.user_id)),
-        baSales: (ba.data ?? []).filter((b) => memberIds.has(b.ba_id)),
-        leaves: (lvs.data ?? []).filter((l) => memberIds.has(l.user_id)),
+        attendance: combinedAttendance.filter((a) => teamEmployeeIds.has(a.user_id) || a.user_id === managerId),
+        baSales: (ba.data ?? []).filter((b) => b.ba_id && (teamEmployeeIds.has(b.ba_id) || b.ba_id === managerId)),
+        leaves: (lvs.data ?? []).filter((l) => l.user_id && (teamEmployeeIds.has(l.user_id) || l.user_id === managerId)),
         holidays: hols.data ?? [],
         profiles,
         allProfiles,
@@ -222,7 +263,7 @@ function ManagerDashboard() {
   const productive = visits.filter((v) => v.productive).length;
 
   const nameOfUser = (id: string | null) =>
-    (data?.profiles ?? []).find((p) => p.id === id)?.full_name || "—";
+    (data?.allProfiles ?? data?.profiles ?? []).find((p) => p.id === id)?.full_name || "—";
   const nameOfDist = (id: string | null) => (data?.distributors ?? []).find((d) => d.id === id)?.name || "—";
   const nameOfCsa = (id: string | null) => (data?.csas ?? []).find((c) => c.id === id)?.name || "—";
   const nameOfRetailer = (id: string | null) => (data?.retailers ?? []).find((r) => r.id === id)?.name || "—";
