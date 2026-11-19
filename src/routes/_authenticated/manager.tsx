@@ -288,7 +288,7 @@ function ManagerDashboard() {
       .reduce((a, b) => a + Number(b.amount ?? 0), 0);
     const v = visits.filter((x) => x.salesman_id === p.id);
     const present = (data?.attendance ?? []).filter((a) => a.user_id === p.id && a.punch_in).length;
-    
+
     // Calculate leave days intersecting with [from, to]
     let leaveDays = 0;
     (data?.leaves ?? []).filter(l => l.user_id === p.id).forEach(l => {
