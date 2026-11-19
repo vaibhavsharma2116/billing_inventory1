@@ -75,8 +75,8 @@ export function AutoPayroll() {
       const [profilesRaw, roles, attendance, leaves, expenses, salaries, details] = await Promise.all([
         supabase.from("profiles").select("id, full_name, employee_code").order("full_name"),
         supabase.from("user_roles").select("user_id, role"),
-        supabase.from("attendance").select("user_id, work_date, punch_in, punch_out").gte("work_date", from).lte("work_date", to),
-        supabase.from("leaves").select("user_id, from_date, to_date, status, leave_type").eq("status", "approved").gte("to_date", from),
+        supabase.from("attendance").select("user_id, work_date, punch_in, punch_out").gte("work_date", from).lte("work_date", to).limit(10000),
+        supabase.from("leaves").select("user_id, from_date, to_date, status, leave_type").eq("status", "approved").gte("to_date", from).limit(10000),
         supabase
           .from("expenses")
           .select("user_id, total_amount, status, expense_date")
@@ -93,6 +93,7 @@ export function AutoPayroll() {
       );
       return {
         profiles: (profilesRaw.data ?? []).filter((p) => !partyIds.has(p.id)),
+        roles: roles.data ?? [],
         attendance: attendance.data ?? [],
         leaves: leaves.data ?? [],
         expenses: expenses.data ?? [],
@@ -117,6 +118,11 @@ export function AutoPayroll() {
   // Salary month based on actual days; every Sunday is a paid weekly off.
   const workingDays = days.length;
   const offDayCount = useMemo(() => processedDays.filter(isOffDay).length, [processedDays, isOffDay]);
+
+  const baUserIds = useMemo(
+    () => new Set((data?.roles ?? []).filter((r) => r.role === "ba").map((r) => r.user_id)),
+    [data?.roles],
+  );
 
   const lines: PayrollLine[] = useMemo(() => {
     if (!data) return [];
@@ -147,20 +153,26 @@ export function AutoPayroll() {
       if (eligibleDays.length === 0) continue; // safety check
       
       const partMonth = eligibleDays.length < days.length;
-      const offDaySet = new Set(eligibleDays.filter(isOffDay));
       const paidBase = eligibleDays.length;
+      const isBa = baUserIds.has(p.id);
+      const sundayCount = eligibleDays.filter((d) => new Date(`${d}T00:00:00`).getDay() === 0).length;
 
       let presentCount = 0;
       let halfLeaveCount = 0;
       let fullLeaveCount = 0;
+      let approvedWeeklyOffCount = 0;
+      const unworkedDays: string[] = [];
       
       for (const d of eligibleDays) {
-        if (offDaySet.has(d)) continue;
-        
-        const hasPunch = data.attendance.some(a => a.user_id === p.id && a.work_date === d && a.punch_in && a.punch_out);
-        const l = data.leaves.find(l => l.user_id === p.id && l.status === "approved" && d >= l.from_date && d <= l.to_date);
+        const hasPunch = data.attendance.some(
+          (a) => a.user_id === p.id && a.work_date === d && a.punch_in && (a.punch_out || d === todayDate)
+        );
+        const l = data.leaves.find(
+          (l) => l.user_id === p.id && l.status === "approved" && d >= l.from_date && d <= l.to_date
+        );
         const isHalf = l?.leave_type?.toLowerCase().includes("half");
-        
+        const isWeeklyOffLeave = l?.leave_type?.toLowerCase() === "weekly_off";
+
         if (hasPunch) {
           if (isHalf) {
             presentCount += 0.5;
@@ -168,22 +180,41 @@ export function AutoPayroll() {
           } else {
             presentCount += 1;
           }
-        } else {
-          if (l) {
-            if (isHalf) {
-              halfLeaveCount += 0.5;
-            } else {
-              fullLeaveCount += 1;
-            }
+        } else if (l) {
+          if (isWeeklyOffLeave && isBa) {
+            approvedWeeklyOffCount += 1;
+          } else if (isWeeklyOffLeave && !isBa) {
+            fullLeaveCount += 1;
+          } else if (isHalf) {
+            halfLeaveCount += 0.5;
+          } else {
+            fullLeaveCount += 1;
           }
+        } else {
+          unworkedDays.push(d);
         }
       }
 
+      let paidOffCount = 0;
+      let absentDays = 0;
+
+      if (!isBa) {
+        paidOffCount = unworkedDays.filter(isOffDay).length;
+        absentDays = unworkedDays.length - paidOffCount;
+      } else {
+        const remainingWeeklyOffQuota = Math.max(0, sundayCount - approvedWeeklyOffCount);
+        const holidayOffs = unworkedDays.filter((d) => holidays.includes(d) && new Date(`${d}T00:00:00`).getDay() !== 0).length;
+        const nonHolidayUnworked = unworkedDays.filter((d) => !(holidays.includes(d) && new Date(`${d}T00:00:00`).getDay() !== 0));
+
+        const creditedWeeklyOffs = Math.min(nonHolidayUnworked.length, remainingWeeklyOffQuota);
+        paidOffCount = approvedWeeklyOffCount + creditedWeeklyOffs + holidayOffs;
+        absentDays = Math.max(0, nonHolidayUnworked.length - creditedWeeklyOffs);
+      }
+
       const presentDays = presentCount;
-      const paidLeaveDays = offDaySet.size + (payLeaves ? (fullLeaveCount + halfLeaveCount) : 0);
+      const paidLeaveDays = paidOffCount + (payLeaves ? (fullLeaveCount + halfLeaveCount) : 0);
       const paidDays = Math.min(presentDays + paidLeaveDays, paidBase);
       const lopDays = Math.max(paidBase - paidDays, 0);
-      const absentDays = eligibleDays.length - offDaySet.size - presentCount - fullLeaveCount - halfLeaveCount;
 
       const gross =
         num(s?.["basic"]) +
@@ -224,7 +255,7 @@ export function AutoPayroll() {
       });
     }
     return out;
-  }, [data, days, processedDays, from, to, workingDays, payLeaves, addReimbursement, tillToday, todayDate]);
+  }, [data, days, processedDays, from, to, workingDays, payLeaves, addReimbursement, tillToday, todayDate, baUserIds, isOffDay, holidays]);
 
   const payable = lines.filter((l) => l.hasStructure);
   const totalNet = payable.reduce((s, l) => s + l.net, 0);

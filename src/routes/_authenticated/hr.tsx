@@ -189,18 +189,21 @@ function HrPage() {
           .select("user_id, work_date, punch_in, punch_out, location_label")
           .gte("work_date", attDate < from ? attDate : from)
           .lte("work_date", attDate > to ? attDate : to)
-          .order("work_date", { ascending: false }),
+          .order("work_date", { ascending: false })
+          .limit(10000),
         supabase
           .from("leaves")
           .select("id, user_id, leave_type, from_date, to_date, status, reason, created_at")
           .or(`status.eq.pending,to_date.gte.${from}`)
-          .order("created_at", { ascending: false }),
+          .order("created_at", { ascending: false })
+          .limit(10000),
         supabase
           .from("expenses")
           .select("id, user_id, expense_date, kind, distance_km, ta_amount, da_amount, bill_amount, total_amount, route, vendor, notes, status")
           .or(`status.eq.pending,expense_date.gte.${from}`)
           .lte("expense_date", to)
-          .order("expense_date", { ascending: false }),
+          .order("expense_date", { ascending: false })
+          .limit(10000),
         supabase.from("salary_structures").select("*").order("effective_from", { ascending: false }),
       ]);
       const partyIds = new Set(
@@ -210,6 +213,7 @@ function HrPage() {
       );
       return {
         profiles: (profilesRaw.data ?? []).filter((p) => !partyIds.has(p.id)),
+        roles: roles.data ?? [],
         details: (details.data ?? []) as unknown as EmployeeDetail[],
         attendance: attendance.data ?? [],
         leaves: leaves.data ?? [],
@@ -730,8 +734,6 @@ function HrPage() {
                     const exitDate = dObj?.exit_date;
                     const attMap = new Map((calData?.attendance ?? []).map((a) => [a.work_date, a]));
                     const getStatus = (dateStr: string) => {
-                      const dow = new Date(`${dateStr}T00:00:00`).getDay();
-                      if (dow === 0) return "sunday";
                       if (dateStr > today) return "future";
                       if (doj && dateStr < doj) return "not_joined";
                       if (exitDate && dateStr > exitDate) return "exited";
@@ -743,6 +745,8 @@ function HrPage() {
                         const isHalf = leave?.leave_type?.toLowerCase().includes("half");
                         return isHalf ? "half" : "present";
                       }
+                      const dow = new Date(`${dateStr}T00:00:00`).getDay();
+                      if (dow === 0) return "sunday";
                       if (leave) return "leave";
                       if (holidayMap.has(dateStr)) return "holiday";
                       return "absent";
