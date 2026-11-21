@@ -285,7 +285,9 @@ function HrPage() {
   const absentRows = useMemo(() => {
     const scopedProfiles = profiles.filter((p) => attCity === "all" || cityOf(p.id) === attCity);
     const attendanceSet = new Set(
-      (data?.attendance ?? []).filter((a) => a.punch_in).map((a) => `${a.user_id}|${a.work_date}`),
+      (data?.attendance ?? [])
+        .filter((a) => a.punch_in && (a.punch_out || a.work_date === todayStr()))
+        .map((a) => `${a.user_id}|${a.work_date}`),
     );
     const rows: { id: string; name: string; city: string; dates: string[] }[] = [];
     for (const p of scopedProfiles) {
@@ -741,10 +743,18 @@ function HrPage() {
                       const leave = (calData?.leaves ?? []).find(
                         (l) => l.from_date <= dateStr && l.to_date >= dateStr
                       );
-                      if (att?.punch_in) {
-                        const isHalf = leave?.leave_type?.toLowerCase().includes("half");
+                      const isHalf = leave?.leave_type?.toLowerCase().includes("half");
+
+                      // Complete punch: both in and out recorded
+                      if (att?.punch_in && att?.punch_out) {
                         return isHalf ? "half" : "present";
                       }
+
+                      // Shift currently running today (check-out pending)
+                      if (att?.punch_in && !att?.punch_out && dateStr === today) {
+                        return "working";
+                      }
+
                       const dow = new Date(`${dateStr}T00:00:00`).getDay();
                       if (dow === 0) return "sunday";
                       if (leave) return "leave";
@@ -758,6 +768,7 @@ function HrPage() {
                     }
                     const statusStyle: Record<string, string> = {
                       present: "bg-green-500/20 text-green-700 dark:text-green-400 border-green-400/40",
+                      working: "bg-sky-500/20 text-sky-700 dark:text-sky-400 border-sky-400/50",
                       half: "bg-amber-400/20 text-amber-700 dark:text-amber-300 border-amber-400/40",
                       holiday: "bg-purple-500/20 text-purple-700 dark:text-purple-300 border-purple-400/40",
                       absent: "bg-red-500/15 text-red-700 dark:text-red-400 border-red-400/30",
@@ -768,7 +779,7 @@ function HrPage() {
                       exited: "bg-muted/20 text-muted-foreground/40 border-dashed border-border/40",
                     };
                     const statusLabel: Record<string, string> = {
-                      present: "P", half: "½", holiday: "H", absent: "A", leave: "L", sunday: "—", future: "", not_joined: "NA", exited: "—",
+                      present: "P", working: "In", half: "½", holiday: "H", absent: "A", leave: "L", sunday: "—", future: "", not_joined: "NA", exited: "—",
                     };
                     const monthName = new Date(yr, mo - 1, 1).toLocaleDateString("en-IN", { month: "long", year: "numeric" });
                     // Summary counts
@@ -780,6 +791,9 @@ function HrPage() {
                           <p className="font-semibold text-sm">{nameOf(calEmp)} — {monthName}</p>
                           <div className="flex flex-wrap gap-2 text-xs">
                             <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-full bg-green-500 inline-block" />Present {counts["present"] ?? 0}</span>
+                            {Boolean(counts["working"]) && (
+                              <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-full bg-sky-500 inline-block" />Working {counts["working"]}</span>
+                            )}
                             <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-full bg-amber-400 inline-block" />Half Day {counts["half"] ?? 0}</span>
                             <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-full bg-purple-500 inline-block" />Holiday {counts["holiday"] ?? 0}</span>
                             <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-full bg-blue-500 inline-block" />Leave {counts["leave"] ?? 0}</span>
@@ -804,10 +818,11 @@ function HrPage() {
                                 key={dateStr}
                                 title={[
                                   dateStr,
-                                  s === "present" ? `In: ${pinTime}${poutTime ? ` | Out: ${poutTime}` : " | Working"}` : "",
+                                  s === "present" ? `In: ${pinTime} | Out: ${poutTime}` : "",
+                                  s === "working" ? `In: ${pinTime} — Working (Check-out pending)` : "",
                                   s === "half" ? `Half Day • In: ${pinTime}` : "",
                                   s === "holiday" ? `Holiday: ${holidayMap.get(dateStr) ?? "Company Holiday"} (Paid)` : "",
-                                  s === "absent" ? "Absent" : "",
+                                  s === "absent" ? (att?.punch_in && !att?.punch_out ? `In: ${pinTime} — Absent (Check-out missing)` : "Absent") : "",
                                   s === "leave" ? "On Leave" : "",
                                   s === "sunday" && holidayMap.has(dateStr) ? `${holidayMap.get(dateStr)} (Sunday)` : "",
                                 ].filter(Boolean).join(" — ")}
@@ -829,7 +844,7 @@ function HrPage() {
                                   <span className="font-medium">{day(a.work_date)}</span>
                                   <span className="text-muted-foreground tabular-nums">
                                     In: {new Date(a.punch_in!).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", hour12: true })}
-                                    {a.punch_out ? ` · Out: ${new Date(a.punch_out).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", hour12: true })}` : " · Running"}
+                                    {a.punch_out ? ` · Out: ${new Date(a.punch_out).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", hour12: true })}` : (a.work_date === today ? " · Running" : " · No Out")}
                                   </span>
                                 </div>
                               ))}
